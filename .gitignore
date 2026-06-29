@@ -1,0 +1,16 @@
+﻿venv/
+__pycache__/
+*.pyc
+*.pyo
+*.exe
+*.dll
+*.pak
+dist/
+build/
+*.spec
+.env
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
