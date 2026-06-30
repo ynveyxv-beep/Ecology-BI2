@@ -1,64 +1,45 @@
+# ui/eco_dashboard_window.py - ПОЛНАЯ ВЕРСИЯ С НАСТРОЙКАМИ (агрегация + сортировка)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QFileDialog, QMessageBox, QScrollArea,
-    QTabWidget, QComboBox, QDateEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QGridLayout, QGroupBox, QFrame, QSizePolicy
+    QLabel, QFileDialog, QMessageBox,
+    QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView,
+    QGridLayout, QComboBox
 )
-from PySide6.QtGui import QFont
 
 import pandas as pd
 import numpy as np
 import pyqtgraph as pg
 import traceback
+import os
+from datetime import datetime
 
-# ─── Импорт модулей Славика ──────────────────────────────────────────────
-try:
-    from eco_modules import (
-        get_kpi, get_by_category, get_by_omsu, get_by_mro,
-        get_time_series, get_trash_analysis, load_excel, export_excel
-    )
-    ECO_MODULES_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ eco_modules not available: {e}")
-    ECO_MODULES_AVAILABLE = False
-    
-    def get_kpi(df):
-        return {'total': len(df), 'done': 0, 'in_progress': 0, 'pct_done': '—', 
-                'omsu_count': 0, 'category_count': 0, 'period': '—'}
-    
-    def get_by_category(df):
-        return pd.DataFrame(columns=["Категория", "Всего", "Доля %", "Выполнено", "В работе"])
-    
-    def get_by_omsu(df):
-        return pd.DataFrame(columns=["ОМСУ", "Всего", "Доля %", "Выполнено", "В работе", "Бэклог %"])
-    
-    def get_by_mro(df):
-        return pd.DataFrame(columns=["МРО", "Всего", "Доля %", "Выполнено", "В работе"])
-    
-    def get_time_series(df, freq='D'):
-        return pd.DataFrame(columns=["Дата", "Выполнено", "В работе"])
-    
-    def get_trash_analysis(df):
-        return (pd.DataFrame(columns=["ОМСУ", "Всего", "Доля %", "Выполнено", "В работе", "Бэклог %"]),
-                pd.DataFrame(columns=["ОМСУ", "Всего", "Доля %", "Выполнено", "В работе", "Бэклог %"]))
+from logger import logger, LoggerMixin
+from ui.chart_settings_dialog import ChartSettingsDialog
 
 
-class EcoDashboardWindow(QWidget):
-    """Экологический дашборд — стабильная версия"""
+class EcoDashboardWindow(QWidget, LoggerMixin):
+    """Экологический дашборд - ПОЛНАЯ ВЕРСИЯ С НАСТРОЙКАМИ"""
     
     back_clicked = Signal()
     
     def __init__(self):
         super().__init__()
+        self.log.info("🚀 Инициализация EcoDashboardWindow")
+        
         self.data = None
         self.filtered_data = None
         self._is_building = False
-        self._widgets_created = False
+        self.chart_settings = {}
+        self._current_plots = {}
+        
         self.init_ui()
+        self.show_welcome()
+        
+        self.log.info("✅ EcoDashboardWindow инициализирован")
     
     def init_ui(self):
+        """Инициализация интерфейса"""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -92,61 +73,14 @@ class EcoDashboardWindow(QWidget):
         
         main_layout.addWidget(toolbar)
         
-        # ─── Фильтры ────────────────────────────────────────────────────────
-        self.filters_widget = QWidget()
-        self.filters_widget.setStyleSheet("background: white; padding: 5px; border-bottom: 1px solid #dee2e6;")
-        filters_layout = QHBoxLayout(self.filters_widget)
-        filters_layout.setContentsMargins(10, 5, 10, 5)
-        filters_layout.setSpacing(10)
-        
-        filters_layout.addWidget(QLabel("📅 Период:"))
-        self.date_from = QDateEdit()
-        self.date_from.setCalendarPopup(True)
-        self.date_from.setDisplayFormat("dd.MM.yyyy")
-        self.date_from.setSpecialValueText("с")
-        filters_layout.addWidget(self.date_from)
-        
-        filters_layout.addWidget(QLabel("—"))
-        
-        self.date_to = QDateEdit()
-        self.date_to.setCalendarPopup(True)
-        self.date_to.setDisplayFormat("dd.MM.yyyy")
-        self.date_to.setSpecialValueText("по")
-        filters_layout.addWidget(self.date_to)
-        
-        filters_layout.addWidget(QLabel("|"))
-        
-        filters_layout.addWidget(QLabel("Категория:"))
-        self.category_filter = QComboBox()
-        self.category_filter.addItem("Все")
-        self.category_filter.currentTextChanged.connect(self.apply_filters)
-        filters_layout.addWidget(self.category_filter)
-        
-        filters_layout.addWidget(QLabel("|"))
-        
-        filters_layout.addWidget(QLabel("Статус:"))
-        self.status_filter = QComboBox()
-        self.status_filter.addItems(["Все", "выполнено", "в работе"])
-        self.status_filter.currentTextChanged.connect(self.apply_filters)
-        filters_layout.addWidget(self.status_filter)
-        
-        filters_layout.addStretch()
-        
-        reset_btn = QPushButton("🔄 Сбросить")
-        reset_btn.clicked.connect(self.reset_filters)
-        filters_layout.addWidget(reset_btn)
-        
-        main_layout.addWidget(self.filters_widget)
-        
         # ─── Вкладки ──────────────────────────────────────────────────────
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet("""
             QTabWidget::pane { border: none; background: #f5f5f5; }
-            QTabBar::tab { padding: 8px 16px; background: #e9ecef; border: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
+            QTabBar::tab { padding: 8px 16px; background: #e9ecef; border: none; }
             QTabBar::tab:selected { background: white; font-weight: bold; }
         """)
         
-        # Создаём вкладки и сразу заполняем их (без динамического удаления)
         self.tab_overview = QWidget()
         self.tab_categories = QWidget()
         self.tab_geography = QWidget()
@@ -159,18 +93,224 @@ class EcoDashboardWindow(QWidget):
         
         main_layout.addWidget(self.tabs)
         
-        # ─── Создаём все виджеты один раз ────────────────────────────────
         self._create_overview_widgets()
         self._create_categories_widgets()
         self._create_geography_widgets()
         self._create_trash_widgets()
-        
-        self._widgets_created = True
-        
-        # Показываем приветствие
-        self.show_welcome()
     
-    # ─── СОЗДАНИЕ ВИДЖЕТОВ (один раз) ────────────────────────────────────
+    # ─── ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ──────────────────────────────────────────
+    
+    def _create_plot_container(self, plot_widget, title: str, settings_key: str):
+        """Создаёт контейнер с графиком и кнопкой настроек"""
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(2)
+        
+        # Заголовок с кнопкой
+        header = QHBoxLayout()
+        header.setContentsMargins(5, 0, 5, 0)
+        
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        header.addWidget(title_label)
+        header.addStretch()
+        
+        # Кнопка с тремя точками
+        settings_btn = QPushButton("⋮")
+        settings_btn.setFixedSize(30, 25)
+        settings_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                font-size: 18px;
+                font-weight: bold;
+                color: #6c757d;
+            }
+            QPushButton:hover {
+                color: #1F4E79;
+                background-color: #e9ecef;
+                border-radius: 4px;
+            }
+        """)
+        settings_btn.clicked.connect(lambda: self._open_chart_settings(plot_widget, settings_key))
+        header.addWidget(settings_btn)
+        
+        container_layout.addLayout(header)
+        container_layout.addWidget(plot_widget)
+        
+        # Отключаем мышь по умолчанию
+        plot_widget.setMouseEnabled(x=False, y=False)
+        
+        return container
+    
+    def _open_chart_settings(self, plot_widget, settings_key: str):
+        """Открывает диалог настроек графика"""
+        current = self.chart_settings.get(settings_key, {})
+        
+        dialog = ChartSettingsDialog(current, self)
+        dialog.settings_applied.connect(
+            lambda settings: self._apply_chart_settings(plot_widget, settings_key, settings)
+        )
+        dialog.exec()
+    
+    def _apply_chart_settings(self, plot_widget, settings_key: str, settings: dict):
+        """Применяет настройки к графику"""
+        self.chart_settings[settings_key] = settings
+        
+        try:
+            # 1. Масштаб
+            if settings.get('scale_mode') == 'Ручной':
+                try:
+                    plot_widget.setXRange(settings.get('min_x', 0), settings.get('max_x', 100))
+                    plot_widget.setYRange(settings.get('min_y', 0), settings.get('max_y', 100))
+                except:
+                    plot_widget.autoRange()
+            else:
+                plot_widget.autoRange()
+            
+            # 2. Цвет фона
+            bg_color = settings.get('bg_color', '#ffffff')
+            plot_widget.setBackground(bg_color)
+            
+            # 3. Интерактивность
+            enable_pan = settings.get('enable_pan', False)
+            plot_widget.setMouseEnabled(x=enable_pan, y=enable_pan)
+            
+            if not settings.get('enable_zoom', False):
+                plot_widget.setMouseEnabled(x=False, y=False)
+            
+            # 4. Подписи осей
+            x_label = settings.get('x_label', '')
+            y_label = settings.get('y_label', '')
+            if x_label:
+                plot_widget.setLabel('bottom', x_label)
+            if y_label:
+                plot_widget.setLabel('left', y_label)
+            
+            # 5. Заголовок
+            title = settings.get('title', '')
+            if title:
+                plot_widget.setTitle(title)
+            
+            # 6. Легенда
+            if hasattr(plot_widget, 'legend') and plot_widget.legend:
+                plot_widget.legend.setVisible(settings.get('show_legend', True))
+            
+            # 7. Размер шрифта
+            font_size = settings.get('font_size', 10)
+            plot_widget.getAxis('bottom').setTickFont(QtGui.QFont("Arial", font_size))
+            plot_widget.getAxis('left').setTickFont(QtGui.QFont("Arial", font_size))
+            
+            # 8. Агрегация - перестраиваем график с новыми настройками
+            if hasattr(self, '_current_df') and self._current_df is not None:
+                self._rebuild_plot_with_settings(plot_widget, settings_key, settings)
+            
+            plot_widget.repaint()
+            
+        except Exception as e:
+            self.log.warning(f"⚠️ Ошибка применения настроек: {e}")
+    
+    def _apply_aggregation(self, df, settings: dict):
+        """Применяет агрегацию к данным"""
+        if df is None or len(df) == 0:
+            return df
+        
+        aggregation = settings.get('aggregation', 'Без агрегации')
+        if aggregation == 'Без агрегации':
+            return df
+        
+        # Проверяем наличие колонки с датой
+        if 'date' not in df.columns:
+            return df
+        
+        df_copy = df.copy()
+        df_copy['date'] = pd.to_datetime(df_copy['date'], errors='coerce')
+        df_copy = df_copy.dropna(subset=['date'])
+        
+        if len(df_copy) == 0:
+            return df
+        
+        # Выбираем период для группировки
+        freq_map = {
+            'По дням': 'D',
+            'По неделям': 'W',
+            'По месяцам': 'M',
+            'По кварталам': 'Q',
+            'По годам': 'Y'
+        }
+        freq = freq_map.get(aggregation, 'D')
+        
+        # Создаём колонку с периодом
+        df_copy['period'] = df_copy['date'].dt.to_period(freq)
+        
+        # Выбираем метод агрегации
+        agg_method = settings.get('agg_method', 'Сумма')
+        agg_func_map = {
+            'Сумма': 'sum',
+            'Среднее': 'mean',
+            'Максимум': 'max',
+            'Минимум': 'min',
+            'Количество': 'count'
+        }
+        agg_func = agg_func_map.get(agg_method, 'sum')
+        
+        # Группируем
+        grouped = df_copy.groupby('period')
+        
+        if agg_method == 'Количество':
+            result = grouped.size().reset_index(name='count')
+        else:
+            # Для числовых колонок
+            numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) == 0:
+                result = grouped.size().reset_index(name='count')
+            else:
+                result = grouped[numeric_cols[0]].agg(agg_func).reset_index()
+                result.columns = ['period', 'value']
+        
+        # Преобразуем период обратно в дату
+        result['date'] = result['period'].dt.start_time
+        
+        return result
+    
+    def _apply_sorting(self, df, settings: dict):
+        """Применяет сортировку к данным"""
+        if df is None or len(df) == 0:
+            return df
+        
+        sort_by = settings.get('sort_by', 'По дате')
+        sort_order = settings.get('sort_order', 'По возрастанию')
+        limit = settings.get('limit', 0)
+        reverse = settings.get('reverse_order', False)
+        
+        ascending = sort_order == 'По возрастанию'
+        
+        # Определяем колонку для сортировки
+        sort_col_map = {
+            'По дате': 'date' if 'date' in df.columns else None,
+            'По значению': 'value' if 'value' in df.columns else None,
+            'По категории': 'category' if 'category' in df.columns else None
+        }
+        sort_col = sort_col_map.get(sort_by)
+        
+        if sort_col and sort_col in df.columns:
+            df = df.sort_values(by=sort_col, ascending=ascending)
+        
+        if reverse:
+            df = df.iloc[::-1].reset_index(drop=True)
+        
+        if limit > 0 and len(df) > limit:
+            df = df.head(limit)
+        
+        return df
+    
+    def _rebuild_plot_with_settings(self, plot_widget, settings_key: str, settings: dict):
+        """Перестраивает график с учётом настроек агрегации и сортировки"""
+        # Это будет переопределено для каждого типа графика
+        pass
+    
+    # ─── ВКЛАДКА "ОБЗОР" ──────────────────────────────────────────────────
     
     def _create_overview_widgets(self):
         """Создаёт виджеты для вкладки Обзор"""
@@ -178,56 +318,72 @@ class EcoDashboardWindow(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
         
-        # KPI-карточки
+        # ─── KPI-карточки ────────────────────────────────────────────────
         self.kpi_container = QWidget()
-        self.kpi_layout = QHBoxLayout(self.kpi_container)
+        self.kpi_layout = QGridLayout(self.kpi_container)
         self.kpi_layout.setSpacing(10)
         layout.addWidget(self.kpi_container)
         
-        # Графики
-        charts_row = QHBoxLayout()
-        charts_row.setSpacing(15)
+        self.kpi_cards = []
+        kpi_labels = ["Всего", "Выполнено", "В работе", "% выполнения", "ОМСУ", "Период"]
+        kpi_colors = ["#1F4E79", "#28a745", "#fd7e14", "#17a2b8", "#6c757d", "#343a40"]
         
-        # Динамика
-        self.ts_container = QWidget()
-        self.ts_layout = QVBoxLayout(self.ts_container)
-        self.ts_layout.setContentsMargins(0, 0, 0, 0)
-        self.ts_label = QLabel("📈 Динамика обращений")
-        self.ts_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.ts_layout.addWidget(self.ts_label)
+        for i, (label, color) in enumerate(zip(kpi_labels, kpi_colors)):
+            card = QWidget()
+            card.setFixedHeight(75)
+            card.setMinimumWidth(100)
+            card.setStyleSheet(f"""
+                background-color: {color};
+                border-radius: 8px;
+                padding: 5px;
+            """)
+            
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(10, 5, 10, 5)
+            
+            value_label = QLabel("—")
+            value_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
+            value_label.setAlignment(Qt.AlignCenter)
+            card_layout.addWidget(value_label)
+            
+            name_label = QLabel(label)
+            name_label.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 11px;")
+            name_label.setAlignment(Qt.AlignCenter)
+            card_layout.addWidget(name_label)
+            
+            self.kpi_layout.addWidget(card, i // 3, i % 3)
+            self.kpi_cards.append((value_label, name_label))
+        
+        # ─── Временной ряд ──────────────────────────────────────────────
         self.ts_plot = pg.PlotWidget()
         self.ts_plot.setBackground('white')
         self.ts_plot.setMinimumHeight(250)
-        self.ts_layout.addWidget(self.ts_plot)
-        charts_row.addWidget(self.ts_container, 2)
+        self.ts_plot.setLabel('left', 'Количество')
+        self.ts_plot.setLabel('bottom', 'Дни')
+        self.ts_plot.addLegend()
         
-        # Топ категорий
-        self.top_cat_container = QWidget()
-        self.top_cat_layout = QVBoxLayout(self.top_cat_container)
-        self.top_cat_layout.setContentsMargins(0, 0, 0, 0)
-        self.top_cat_label = QLabel("🏆 Топ категорий")
-        self.top_cat_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.top_cat_layout.addWidget(self.top_cat_label)
-        self.top_cat_plot = pg.PlotWidget()
-        self.top_cat_plot.setBackground('white')
-        self.top_cat_plot.setMinimumHeight(250)
-        self.top_cat_layout.addWidget(self.top_cat_plot)
-        charts_row.addWidget(self.top_cat_container, 1)
+        ts_container = self._create_plot_container(
+            self.ts_plot, 
+            "📈 Динамика обращений", 
+            "time_series"
+        )
+        layout.addWidget(ts_container)
         
-        layout.addLayout(charts_row)
+        # ─── Топ категорий ──────────────────────────────────────────────
+        self.plot = pg.PlotWidget()
+        self.plot.setBackground('white')
+        self.plot.setMinimumHeight(250)
+        self.plot.setLabel('left', 'Количество')
+        self.plot.setLabel('bottom', 'Категория')
         
-        # Топ ОМСУ
-        self.top_omsu_container = QWidget()
-        self.top_omsu_layout = QVBoxLayout(self.top_omsu_container)
-        self.top_omsu_layout.setContentsMargins(0, 0, 0, 0)
-        self.top_omsu_label = QLabel("🏆 Топ ОМСУ")
-        self.top_omsu_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.top_omsu_layout.addWidget(self.top_omsu_label)
-        self.top_omsu_plot = pg.PlotWidget()
-        self.top_omsu_plot.setBackground('white')
-        self.top_omsu_plot.setMinimumHeight(250)
-        self.top_omsu_layout.addWidget(self.top_omsu_plot)
-        layout.addWidget(self.top_omsu_container)
+        cat_container = self._create_plot_container(
+            self.plot, 
+            "🏆 Топ категорий", 
+            "top_categories"
+        )
+        layout.addWidget(cat_container)
+    
+    # ─── ВКЛАДКА "КАТЕГОРИИ" ─────────────────────────────────────────────
     
     def _create_categories_widgets(self):
         """Создаёт виджеты для вкладки Категории"""
@@ -243,8 +399,18 @@ class EcoDashboardWindow(QWidget):
         
         self.cat_plot = pg.PlotWidget()
         self.cat_plot.setBackground('white')
-        self.cat_plot.setMinimumHeight(300)
-        layout.addWidget(self.cat_plot)
+        self.cat_plot.setMinimumHeight(250)
+        self.cat_plot.setLabel('left', 'Количество')
+        self.cat_plot.setLabel('bottom', 'Категория')
+        
+        cat_plot_container = self._create_plot_container(
+            self.cat_plot,
+            "📊 Распределение по категориям",
+            "categories_chart"
+        )
+        layout.addWidget(cat_plot_container)
+    
+    # ─── ВКЛАДКА "ГЕОГРАФИЯ" ──────────────────────────────────────────────
     
     def _create_geography_widgets(self):
         """Создаёт виджеты для вкладки География"""
@@ -269,8 +435,18 @@ class EcoDashboardWindow(QWidget):
         
         self.geo_plot = pg.PlotWidget()
         self.geo_plot.setBackground('white')
-        self.geo_plot.setMinimumHeight(300)
-        layout.addWidget(self.geo_plot)
+        self.geo_plot.setMinimumHeight(250)
+        self.geo_plot.setLabel('left', 'Количество')
+        self.geo_plot.setLabel('bottom', 'Наименование')
+        
+        geo_plot_container = self._create_plot_container(
+            self.geo_plot,
+            "🗺️ Распределение по территории",
+            "geography_chart"
+        )
+        layout.addWidget(geo_plot_container)
+    
+    # ─── ВКЛАДКА "МУСОР" ──────────────────────────────────────────────────
     
     def _create_trash_widgets(self):
         """Создаёт виджеты для вкладки Мусор"""
@@ -307,172 +483,134 @@ class EcoDashboardWindow(QWidget):
         
         self.trash_plot = pg.PlotWidget()
         self.trash_plot.setBackground('white')
-        self.trash_plot.setMinimumHeight(250)
-        layout.addWidget(self.trash_plot)
+        self.trash_plot.setMinimumHeight(200)
+        self.trash_plot.setLabel('left', 'Количество')
+        self.trash_plot.setLabel('bottom', 'ОМСУ')
+        
+        trash_plot_container = self._create_plot_container(
+            self.trash_plot,
+            "♻️ Мусор, свалки, стоки",
+            "trash_chart"
+        )
+        layout.addWidget(trash_plot_container)
     
-    # ─── ОТОБРАЖЕНИЕ ДАННЫХ ──────────────────────────────────────────────
+    # ─── ПРИВЕТСТВИЕ ──────────────────────────────────────────────────────
     
     def show_welcome(self):
         """Показывает приветствие"""
-        # Просто очищаем виджеты через их методы
-        self.kpi_layout = QHBoxLayout(self.kpi_container)
-        self.kpi_layout.setSpacing(10)
+        for value_label, name_label in self.kpi_cards:
+            value_label.setText("—")
         
-        self.ts_plot.clear()
-        self.top_cat_plot.clear()
-        self.top_omsu_plot.clear()
-        self.cat_plot.clear()
-        self.geo_plot.clear()
-        self.trash_plot.clear()
+        for plot in [self.ts_plot, self.plot, self.cat_plot, self.geo_plot, self.trash_plot]:
+            plot.clear()
+            text = pg.TextItem("🌿 Загрузите данные", color=(150, 150, 150))
+            text.setPos(0, 0)
+            plot.addItem(text)
         
-        # Добавляем приветствие на вкладки через QLabel
-        self._show_message_on_tab(self.tab_overview, "🌿 Загрузите данные для отображения дашборда")
-        self._show_message_on_tab(self.tab_categories, "🌿 Загрузите данные для отображения дашборда")
-        self._show_message_on_tab(self.tab_geography, "🌿 Загрузите данные для отображения дашборда")
-        self._show_message_on_tab(self.tab_trash, "🌿 Загрузите данные для отображения дашборда")
+        for table in [self.cat_table, self.geo_table, self.trash_count_table, self.trash_backlog_table]:
+            table.setRowCount(0)
+        
+        self.info_label.setText("Данные не загружены")
+        self.report_btn.setEnabled(False)
     
-    def _show_message_on_tab(self, tab, message):
-        """Показывает сообщение на вкладке"""
-        # Ищем существующий label
-        for i in range(tab.layout().count()):
-            widget = tab.layout().itemAt(i).widget()
-            if isinstance(widget, QLabel) and "Загрузите" in widget.text():
-                widget.setText(message)
-                widget.setAlignment(Qt.AlignCenter)
-                widget.setStyleSheet("font-size: 18px; color: #888; padding: 40px;")
-                return
-        
-        # Если нет — создаём
-        label = QLabel(message)
-        label.setAlignment(Qt.AlignCenter)
-        label.setStyleSheet("font-size: 18px; color: #888; padding: 40px;")
-        tab.layout().insertWidget(0, label)
+    # ─── ЗАГРУЗКА ДАННЫХ ──────────────────────────────────────────────────
     
     def load_data(self):
-        """Загружает данные"""
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Загрузить данные", "", "Excel (*.xlsx *.xls);;CSV (*.csv)"
-        )
-        if not path:
-            return
+        """Загружает данные через диалог"""
+        self.log.info("📂 Начало загрузки данных")
         
         try:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Загрузить данные", "", "Excel (*.xlsx *.xls);;CSV (*.csv)"
+            )
+            
+            if not path:
+                self.log.warning("❌ Загрузка отменена")
+                return
+            
+            self.log.info(f"📄 Выбран файл: {path}")
+            self._load_data_from_path(path)
+            
+        except Exception as e:
+            self.log.critical(f"❌ ОШИБКА: {e}")
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", str(e))
+    
+    def _load_data_from_path(self, path: str):
+        """Загружает данные из указанного пути"""
+        self.log.info(f"→ _load_data_from_path({path})")
+        
+        try:
+            if not os.path.exists(path):
+                self.log.error(f"❌ Файл не существует: {path}")
+                QMessageBox.critical(self, "Ошибка", "Файл не найден")
+                return
+            
+            file_size = os.path.getsize(path) / 1024 / 1024
+            self.log.info(f"📊 Размер файла: {file_size:.2f} МБ")
+            
+            self.log.debug("Чтение файла...")
             if path.endswith('.csv'):
                 df = pd.read_csv(path)
             else:
-                df = pd.read_excel(path)
+                df = pd.read_excel(path, engine='openpyxl')
             
-            if df is None or len(df) == 0:
+            self.log.info(f"✅ Прочитано: {len(df)} строк")
+            self.log.debug(f"Колонки: {df.columns.tolist()}")
+            
+            if len(df) == 0:
+                self.log.warning("Файл пуст")
                 QMessageBox.warning(self, "Предупреждение", "Файл пуст")
                 return
             
-            # Нормализуем колонки
+            # Нормализация
             df.columns = [str(col).strip().lower() for col in df.columns]
             
-            # Создаём необходимые колонки
             for col in ['date', 'status', 'category', 'omsu', 'mro']:
                 if col not in df.columns:
+                    self.log.warning(f"⚠️ Колонка '{col}' отсутствует, добавляем")
                     df[col] = 'Не указано'
             
             if 'date' in df.columns:
-                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                try:
+                    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                    valid_dates = df['date'].notna().sum()
+                    self.log.info(f"📅 Валидных дат: {valid_dates} из {len(df)}")
+                except Exception as e:
+                    self.log.warning(f"Ошибка дат: {e}")
             
             if 'status' in df.columns:
-                df['status'] = df['status'].astype(str).str.lower().str.strip()
-                df['status'] = df['status'].apply(
-                    lambda x: 'выполнено' if any(w in x for w in ['выполн', 'done', 'closed', 'закрыт', 'complete'])
-                    else 'в работе' if any(w in x for w in ['работ', 'progress', 'open', 'ожида'])
-                    else 'Не указано'
-                )
-            
-            if 'category' in df.columns:
-                df['category'] = df['category'].fillna('Не указано')
+                try:
+                    df['status'] = df['status'].astype(str).str.lower().str.strip()
+                    df['status'] = df['status'].apply(
+                        lambda x: 'выполнено' if any(w in x for w in ['выполн', 'done', 'closed', 'закрыт', 'complete'])
+                        else 'в работе' if any(w in x for w in ['работ', 'progress', 'open', 'ожида'])
+                        else x
+                    )
+                except Exception as e:
+                    self.log.warning(f"Ошибка статусов: {e}")
             
             self.data = df
             self.filtered_data = df.copy()
+            self._current_df = df.copy()
             
-            self._update_filters()
-            
+            self.log.info(f"✅ Данные загружены: {len(df)} строк")
+            self.info_label.setText(f"✅ {len(df)} строк")
             self.report_btn.setEnabled(True)
-            self.info_label.setText(f"✅ {len(self.data)} строк, {len(self.data.columns)} колонок")
             
             self.build_dashboard()
             
         except Exception as e:
-            traceback.print_exc()
-            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{str(e)}")
-    
-    def _update_filters(self):
-        """Обновляет фильтры"""
-        try:
-            if self.data is None:
-                return
-            
-            self.category_filter.clear()
-            self.category_filter.addItem("Все")
-            if 'category' in self.data.columns:
-                cats = sorted(self.data['category'].dropna().unique())
-                for cat in cats:
-                    if cat and cat != 'Не указано':
-                        self.category_filter.addItem(cat)
-            
-            if 'date' in self.data.columns and len(self.data['date'].dropna()) > 0:
-                min_date = self.data['date'].min()
-                max_date = self.data['date'].max()
-                if pd.notna(min_date) and pd.notna(max_date):
-                    from PySide6.QtCore import QDate
-                    self.date_from.setDate(QDate(min_date.year, min_date.month, min_date.day))
-                    self.date_to.setDate(QDate(max_date.year, max_date.month, max_date.day))
-        except Exception as e:
-            print(f"⚠️ Update filters error: {e}")
-    
-    def reset_filters(self):
-        """Сбрасывает фильтры"""
-        try:
-            self.status_filter.setCurrentIndex(0)
-            self.category_filter.setCurrentIndex(0)
-            self.date_from.setSpecialValueText("с")
-            self.date_to.setSpecialValueText("по")
-            self.apply_filters()
-        except Exception as e:
-            print(f"⚠️ Reset filters error: {e}")
-    
-    def apply_filters(self):
-        """Применяет фильтры"""
-        try:
-            if self.data is None:
-                return
-            
-            df = self.data.copy()
-            
-            if self.date_from.date().isValid() and self.date_to.date().isValid():
-                from PySide6.QtCore import QDate
-                date_from = QDate(self.date_from.date().year(), self.date_from.date().month(), self.date_from.date().day())
-                date_to = QDate(self.date_to.date().year(), self.date_to.date().month(), self.date_to.date().day())
-                
-                if 'date' in df.columns:
-                    mask = (df['date'] >= pd.Timestamp(date_from.toPython())) & (df['date'] <= pd.Timestamp(date_to.toPython()))
-                    df = df[mask]
-            
-            status = self.status_filter.currentText()
-            if status != "Все" and 'status' in df.columns:
-                df = df[df['status'] == status]
-            
-            category = self.category_filter.currentText()
-            if category != "Все" and 'category' in df.columns:
-                df = df[df['category'] == category]
-            
-            self.filtered_data = df
-            self.build_dashboard()
-            
-        except Exception as e:
-            print(f"⚠️ Apply filters error: {e}")
-            traceback.print_exc()
+            self.log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+            self.log.critical(traceback.format_exc())
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить:\n{str(e)}")
     
     # ─── ПОСТРОЕНИЕ ДАШБОРДА ──────────────────────────────────────────────
     
     def build_dashboard(self):
         """Строит дашборд"""
+        self.log.info("🏗️ Построение дашборда")
+        
         if self._is_building:
             return
         
@@ -485,336 +623,499 @@ class EcoDashboardWindow(QWidget):
                 self.show_welcome()
                 return
             
-            # Убираем приветственные сообщения
-            self._clear_welcome_messages()
+            self.log.debug(f"Строим из {len(df)} строк")
             
-            # Строим каждый компонент
-            self._build_kpi(df)
+            self._update_kpi(df)
             self._build_time_series(df)
-            self._build_top_categories(df)
-            self._build_top_omsu(df)
-            self._build_categories_table(df)
+            self._build_category_chart(df)
+            self._build_categories(df)
             self._build_geography(df)
             self._build_trash(df)
             
+            self.log.info("✅ Дашборд построен")
+            
         except Exception as e:
-            print(f"❌ Build dashboard error: {e}")
-            traceback.print_exc()
+            self.log.critical(f"❌ Ошибка построения: {e}")
+            self.log.critical(traceback.format_exc())
+            QMessageBox.warning(self, "Ошибка", f"Не удалось построить дашборд:\n{str(e)}")
         
         finally:
             self._is_building = False
     
-    def _clear_welcome_messages(self):
-        """Убирает приветственные сообщения со всех вкладок"""
-        for tab in [self.tab_overview, self.tab_categories, self.tab_geography, self.tab_trash]:
-            for i in range(tab.layout().count()):
-                widget = tab.layout().itemAt(i).widget()
-                if isinstance(widget, QLabel) and "Загрузите" in widget.text():
-                    widget.deleteLater()
+    # ─── KPI ──────────────────────────────────────────────────────────────
     
-    # ─── KPI ────────────────────────────────────────────────────────────────
-    
-    def _build_kpi(self, df):
-        """Строит KPI-карточки"""
+    def _update_kpi(self, df):
+        """Обновляет KPI"""
+        self.log.debug("→ _update_kpi()")
+        
         try:
-            # Очищаем существующие карточки
-            while self.kpi_layout.count():
-                item = self.kpi_layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+            total = len(df)
+            done = len(df[df['status'] == 'выполнено']) if 'status' in df.columns else 0
+            in_progress = len(df[df['status'] == 'в работе']) if 'status' in df.columns else 0
+            pct_done = f"{(done / total * 100):.1f}%" if total > 0 else "—"
+            omsu_count = df['omsu'].nunique() if 'omsu' in df.columns else 0
             
-            kpi = get_kpi(df)
+            if 'date' in df.columns and len(df['date'].dropna()) > 0:
+                period = f"{df['date'].min().strftime('%d.%m.%Y')} - {df['date'].max().strftime('%d.%m.%Y')}"
+            else:
+                period = "—"
             
-            kpi_data = [
-                ("Всего", f"{kpi['total']:,}", "#1F4E79"),
-                ("Выполнено", f"{kpi['done']:,}", "#28a745"),
-                ("В работе", f"{kpi['in_progress']:,}", "#fd7e14"),
-                ("% выполнения", kpi['pct_done'], "#17a2b8"),
-                ("ОМСУ", f"{kpi['omsu_count']:,}", "#6c757d"),
-                ("Период", kpi['period'], "#343a40"),
+            kpi_values = [
+                f"{total:,}",
+                f"{done:,}",
+                f"{in_progress:,}",
+                pct_done,
+                f"{omsu_count:,}",
+                period
             ]
             
-            for label, value, color in kpi_data:
-                card = QWidget()
-                card.setFixedHeight(75)
-                card.setMinimumWidth(100)
-                card.setStyleSheet(f"""
-                    background-color: {color};
-                    border-radius: 8px;
-                    padding: 5px 10px;
-                """)
-                card_layout = QVBoxLayout(card)
-                card_layout.setContentsMargins(10, 5, 10, 5)
-                
-                val_label = QLabel(str(value))
-                val_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
-                val_label.setAlignment(Qt.AlignCenter)
-                card_layout.addWidget(val_label)
-                
-                name_label = QLabel(label)
-                name_label.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 11px;")
-                name_label.setAlignment(Qt.AlignCenter)
-                card_layout.addWidget(name_label)
-                
-                self.kpi_layout.addWidget(card)
+            for i, (value_label, name_label) in enumerate(self.kpi_cards):
+                value_label.setText(kpi_values[i])
             
-            self.kpi_layout.addStretch()
+            self.log.debug("← _update_kpi() завершён")
             
         except Exception as e:
-            print(f"⚠️ KPI error: {e}")
+            self.log.error(f"⚠️ Ошибка KPI: {e}")
     
-    # ─── Временной ряд ─────────────────────────────────────────────────────
+    # ─── ВРЕМЕННОЙ РЯД ────────────────────────────────────────────────────
     
     def _build_time_series(self, df):
-        """Строит график временного ряда"""
+        """Строит временной ряд с учётом настроек"""
+        self.log.debug("→ _build_time_series()")
+        
         try:
             self.ts_plot.clear()
             
             if 'date' not in df.columns:
+                self.log.warning("⚠️ Нет колонки date")
                 text = pg.TextItem("Нет данных с датой", color=(150, 150, 150))
                 self.ts_plot.addItem(text)
                 return
             
-            ts = get_time_series(df, 'D')
-            if len(ts) == 0:
-                text = pg.TextItem("Нет данных", color=(150, 150, 150))
+            # Применяем настройки к данным
+            settings = self.chart_settings.get('time_series', {})
+            df_agg = self._apply_aggregation(df, settings)
+            df_sorted = self._apply_sorting(df_agg, settings)
+            
+            if len(df_sorted) == 0:
+                text = pg.TextItem("Нет данных после агрегации", color=(150, 150, 150))
                 self.ts_plot.addItem(text)
                 return
             
-            dates = ts["Дата"].dt.strftime("%d.%m")
-            
-            if "В работе" in ts.columns:
-                self.ts_plot.plot(
-                    dates, ts["В работе"],
-                    pen=pg.mkPen(color=(253, 126, 20), width=2),
-                    name="В работе"
-                )
-            if "Выполнено" in ts.columns:
-                self.ts_plot.plot(
-                    dates, ts["Выполнено"],
-                    pen=pg.mkPen(color=(40, 167, 69), width=2),
-                    name="Выполнено"
-                )
-            
-            self.ts_plot.addLegend()
-            self.ts_plot.setLabel('left', 'Количество')
-            self.ts_plot.setLabel('bottom', 'Дата')
-            
-        except Exception as e:
-            print(f"⚠️ Time series error: {e}")
-    
-    # ─── Топ категорий ─────────────────────────────────────────────────────
-    
-    def _build_top_categories(self, df):
-        """Строит график топ-категорий"""
-        try:
-            self.top_cat_plot.clear()
-            
-            cat = get_by_category(df)
-            if len(cat) == 0:
-                text = pg.TextItem("Нет данных", color=(150, 150, 150))
-                self.top_cat_plot.addItem(text)
+            # Подготовка данных для графика
+            if 'period' in df_sorted.columns and 'value' in df_sorted.columns:
+                # Агрегированные данные
+                dates = df_sorted['period'].dt.strftime('%d.%m')
+                values = df_sorted['value'].values
+            elif 'date' in df_sorted.columns:
+                # Обычные данные
+                df_copy = df_sorted.copy()
+                df_copy['date_day'] = df_copy['date'].dt.date
+                
+                if 'status' in df_copy.columns:
+                    statuses = ['выполнено', 'в работе']
+                    colors = {'выполнено': (40, 167, 69), 'в работе': (253, 126, 20)}
+                    
+                    for status in statuses:
+                        status_df = df_copy[df_copy['status'] == status]
+                        if len(status_df) > 0:
+                            daily_counts = status_df.groupby('date_day').size()
+                            daily_counts = daily_counts.sort_index()
+                            
+                            if len(daily_counts) > 0:
+                                x = np.arange(len(daily_counts))
+                                y = daily_counts.values
+                                color = colors.get(status, (100, 100, 100))
+                                
+                                self.ts_plot.plot(
+                                    x, y,
+                                    pen=pg.mkPen(color=color, width=settings.get('line_width', 2)),
+                                    name=status
+                                )
+                                self.log.debug(f"✅ Линия для '{status}': {len(daily_counts)} точек")
+                    self.ts_plot.addLegend()
+                else:
+                    daily_counts = df_copy.groupby('date_day').size()
+                    daily_counts = daily_counts.sort_index()
+                    
+                    if len(daily_counts) > 0:
+                        x = np.arange(len(daily_counts))
+                        y = daily_counts.values
+                        
+                        self.ts_plot.plot(
+                            x, y,
+                            pen=pg.mkPen(color=(40, 167, 69), width=settings.get('line_width', 2)),
+                            symbol='o',
+                            symbolSize=settings.get('point_size', 4),
+                            symbolBrush=(40, 167, 69)
+                        )
+            else:
+                text = pg.TextItem("Нет данных для отображения", color=(150, 150, 150))
+                self.ts_plot.addItem(text)
                 return
             
-            cat = cat.head(8)
-            names = cat["Категория"].tolist()
-            values = cat["Всего"].tolist()
+            self.ts_plot.setLabel('left', settings.get('y_label', 'Количество'))
+            self.ts_plot.setLabel('bottom', settings.get('x_label', 'Дни'))
+            self.ts_plot.autoRange()
             
-            bars = pg.BarGraphItem(
-                x=np.arange(len(names)),
-                height=values,
-                width=0.6,
-                brush=pg.mkBrush(0, 120, 215)
-            )
-            self.top_cat_plot.addItem(bars)
-            self.top_cat_plot.setLabel('left', 'Количество')
-            self.top_cat_plot.getAxis('bottom').setTicks([[(i, name[:12]) for i, name in enumerate(names)]])
-            self.top_cat_plot.setXRange(-0.5, len(names) - 0.5)
+            # Применяем остальные настройки
+            self._apply_chart_settings(self.ts_plot, 'time_series', settings)
+            
+            self.log.info("✅ Временной ряд построен")
             
         except Exception as e:
-            print(f"⚠️ Top categories error: {e}")
+            self.log.error(f"⚠️ Ошибка временного ряда: {e}")
+            traceback.print_exc()
+            text = pg.TextItem(f"Ошибка: {str(e)[:30]}", color=(200, 50, 50))
+            self.ts_plot.addItem(text)
     
-    # ─── Топ ОМСУ ──────────────────────────────────────────────────────────
+    # ─── ГРАФИК КАТЕГОРИЙ ──────────────────────────────────────────────────
     
-    def _build_top_omsu(self, df):
-        """Строит график топ-ОМСУ"""
+    def _build_category_chart(self, df):
+        """Строит график категорий (для обзора) с учётом настроек"""
+        self.log.debug("→ _build_category_chart()")
+        
         try:
-            self.top_omsu_plot.clear()
+            self.plot.clear()
             
-            omsu = get_by_omsu(df)
-            if len(omsu) == 0:
+            if 'category' not in df.columns:
+                self.log.warning("⚠️ Нет колонки category")
                 text = pg.TextItem("Нет данных", color=(150, 150, 150))
-                self.top_omsu_plot.addItem(text)
+                self.plot.addItem(text)
                 return
             
-            omsu = omsu.head(8)
-            names = omsu["ОМСУ"].tolist()
-            values = omsu["Всего"].tolist()
+            settings = self.chart_settings.get('top_categories', {})
+            
+            counts = df['category'].value_counts().head(settings.get('limit', 10) or 10)
+            
+            if len(counts) == 0:
+                text = pg.TextItem("Нет данных", color=(150, 150, 150))
+                self.plot.addItem(text)
+                return
+            
+            # Сортировка
+            sort_order = settings.get('sort_order', 'По убыванию')
+            if sort_order == 'По возрастанию':
+                counts = counts.sort_values(ascending=True)
             
             bars = pg.BarGraphItem(
-                x=np.arange(len(names)),
-                height=values,
+                x=np.arange(len(counts)),
+                height=counts.values,
                 width=0.6,
-                brush=pg.mkBrush(46, 134, 171)
+                brush=pg.mkBrush(settings.get('main_color', '#1F4E79'))
             )
-            self.top_omsu_plot.addItem(bars)
-            self.top_omsu_plot.setLabel('left', 'Количество')
-            self.top_omsu_plot.getAxis('bottom').setTicks([[(i, name[:12]) for i, name in enumerate(names)]])
-            self.top_omsu_plot.setXRange(-0.5, len(names) - 0.5)
+            self.plot.addItem(bars)
+            
+            ticks = [[(i, str(name)[:15]) for i, name in enumerate(counts.index)]]
+            self.plot.getAxis('bottom').setTicks(ticks)
+            self.plot.setXRange(-0.5, len(counts) - 0.5)
+            self.plot.setLabel('left', settings.get('y_label', 'Количество'))
+            self.plot.setLabel('bottom', settings.get('x_label', 'Категория'))
+            
+            # Применяем остальные настройки
+            self._apply_chart_settings(self.plot, 'top_categories', settings)
+            
+            self.log.info(f"✅ Построен график с {len(counts)} категориями")
             
         except Exception as e:
-            print(f"⚠️ Top OMSU error: {e}")
+            self.log.error(f"⚠️ Ошибка графика категорий: {e}")
+            traceback.print_exc()
     
-    # ─── Таблица категорий ─────────────────────────────────────────────────
+    # ─── КАТЕГОРИИ (ТАБЛИЦА + ГРАФИК) ─────────────────────────────────────
     
-    def _build_categories_table(self, df):
-        """Строит таблицу категорий"""
+    def _build_categories(self, df):
+        """Строит таблицу и график категорий"""
+        self.log.debug("→ _build_categories()")
+        
         try:
-            cat = get_by_category(df)
-            
-            self.cat_table.setRowCount(len(cat))
-            for i, row in cat.iterrows():
-                self.cat_table.setItem(i, 0, QTableWidgetItem(str(row["Категория"])))
-                self.cat_table.setItem(i, 1, QTableWidgetItem(str(row["Всего"])))
-                self.cat_table.setItem(i, 2, QTableWidgetItem(f"{row['Доля %']:.1f}%"))
-                self.cat_table.setItem(i, 3, QTableWidgetItem(str(row["Выполнено"])))
-                self.cat_table.setItem(i, 4, QTableWidgetItem(str(row["В работе"])))
-            
-            # График категорий
             self.cat_plot.clear()
-            if len(cat) > 0:
-                names = cat["Категория"].tolist()
-                values = cat["Всего"].tolist()
+            
+            if 'category' not in df.columns:
+                self.log.warning("⚠️ Нет колонки category")
+                text = pg.TextItem("Нет данных", color=(150, 150, 150))
+                self.cat_plot.addItem(text)
+                return
+            
+            settings = self.chart_settings.get('categories_chart', {})
+            
+            counts = df['category'].value_counts().reset_index()
+            counts.columns = ['Категория', 'Всего']
+            counts['Доля %'] = (counts['Всего'] / counts['Всего'].sum() * 100).round(1)
+            
+            if 'status' in df.columns:
+                done = df[df['status'] == 'выполнено']['category'].value_counts()
+                in_progress = df[df['status'] == 'в работе']['category'].value_counts()
+                counts['Выполнено'] = counts['Категория'].map(done).fillna(0).astype(int)
+                counts['В работе'] = counts['Категория'].map(in_progress).fillna(0).astype(int)
+            else:
+                counts['Выполнено'] = 0
+                counts['В работе'] = 0
+            
+            # Применяем сортировку
+            limit = settings.get('limit', 0)
+            if limit > 0:
+                counts = counts.head(limit)
+            
+            sort_order = settings.get('sort_order', 'По убыванию')
+            if sort_order == 'По возрастанию':
+                counts = counts.sort_values('Всего', ascending=True)
+            
+            self.cat_table.setRowCount(len(counts))
+            for i, row in counts.iterrows():
+                self.cat_table.setItem(i, 0, QTableWidgetItem(str(row['Категория'])))
+                self.cat_table.setItem(i, 1, QTableWidgetItem(str(row['Всего'])))
+                self.cat_table.setItem(i, 2, QTableWidgetItem(f"{row['Доля %']:.1f}%"))
+                self.cat_table.setItem(i, 3, QTableWidgetItem(str(row.get('Выполнено', 0))))
+                self.cat_table.setItem(i, 4, QTableWidgetItem(str(row.get('В работе', 0))))
+            
+            if len(counts) > 0:
                 bars = pg.BarGraphItem(
-                    x=np.arange(len(names)),
-                    height=values,
+                    x=np.arange(len(counts)),
+                    height=counts['Всего'].values,
                     width=0.6,
-                    brush=pg.mkBrush(0, 120, 215)
+                    brush=pg.mkBrush(settings.get('main_color', '#1F4E79'))
                 )
                 self.cat_plot.addItem(bars)
-                self.cat_plot.getAxis('bottom').setTicks([[(i, name[:15]) for i, name in enumerate(names)]])
-                self.cat_plot.setXRange(-0.5, len(names) - 0.5)
                 
+                ticks = [[(i, str(name)[:15]) for i, name in enumerate(counts['Категория'].values)]]
+                self.cat_plot.getAxis('bottom').setTicks(ticks)
+                self.cat_plot.setXRange(-0.5, len(counts) - 0.5)
+                self.cat_plot.setLabel('left', settings.get('y_label', 'Количество'))
+                self.cat_plot.setLabel('bottom', settings.get('x_label', 'Категория'))
+            
+            # Применяем остальные настройки
+            self._apply_chart_settings(self.cat_plot, 'categories_chart', settings)
+            
+            self.log.info(f"✅ Категории построены: {len(counts)} записей")
+            
         except Exception as e:
-            print(f"⚠️ Categories table error: {e}")
+            self.log.error(f"⚠️ Ошибка категорий: {e}")
+            traceback.print_exc()
     
-    # ─── География ──────────────────────────────────────────────────────────
+    # ─── ГЕОГРАФИЯ ─────────────────────────────────────────────────────────
     
     def _build_geography(self, df):
         """Строит географию"""
+        self.log.debug("→ _build_geography()")
         try:
             self.update_geography()
         except Exception as e:
-            print(f"⚠️ Geography error: {e}")
+            self.log.error(f"⚠️ Ошибка географии: {e}")
+            traceback.print_exc()
     
     def update_geography(self):
         """Обновляет географию"""
+        self.log.debug("→ update_geography()")
+        
         try:
+            self.geo_plot.clear()
+            
             if self.filtered_data is None or len(self.filtered_data) == 0:
+                text = pg.TextItem("Нет данных", color=(150, 150, 150))
+                self.geo_plot.addItem(text)
                 return
             
             df = self.filtered_data
             geo_type = self.geo_type.currentText()
+            settings = self.chart_settings.get('geography_chart', {})
             
             if geo_type == "По ОМСУ":
-                data = get_by_omsu(df)
+                col = 'omsu'
                 name_col = "ОМСУ"
             else:
-                data = get_by_mro(df)
+                col = 'mro'
                 name_col = "МРО"
             
-            self.geo_table.setRowCount(len(data))
-            for i, row in data.iterrows():
+            if col not in df.columns:
+                text = pg.TextItem(f"Нет данных по {name_col}", color=(150, 150, 150))
+                self.geo_plot.addItem(text)
+                return
+            
+            counts = df[col].value_counts().reset_index()
+            counts.columns = [name_col, 'Всего']
+            counts['Доля %'] = (counts['Всего'] / counts['Всего'].sum() * 100).round(1)
+            
+            if 'status' in df.columns:
+                done = df[df['status'] == 'выполнено'][col].value_counts()
+                in_progress = df[df['status'] == 'в работе'][col].value_counts()
+                counts['Выполнено'] = counts[name_col].map(done).fillna(0).astype(int)
+                counts['В работе'] = counts[name_col].map(in_progress).fillna(0).astype(int)
+            else:
+                counts['Выполнено'] = 0
+                counts['В работе'] = 0
+            
+            counts['Бэклог %'] = (counts['В работе'] / counts['Всего'].replace(0, pd.NA) * 100).round(1).fillna(0.0)
+            
+            # Применяем сортировку
+            limit = settings.get('limit', 10) or 10
+            counts = counts.head(limit)
+            
+            sort_order = settings.get('sort_order', 'По убыванию')
+            if sort_order == 'По возрастанию':
+                counts = counts.sort_values('Всего', ascending=True)
+            
+            self.geo_table.setRowCount(len(counts))
+            for i, row in counts.iterrows():
                 self.geo_table.setItem(i, 0, QTableWidgetItem(str(row[name_col])))
-                self.geo_table.setItem(i, 1, QTableWidgetItem(str(row["Всего"])))
+                self.geo_table.setItem(i, 1, QTableWidgetItem(str(row['Всего'])))
                 self.geo_table.setItem(i, 2, QTableWidgetItem(f"{row['Доля %']:.1f}%"))
-                self.geo_table.setItem(i, 3, QTableWidgetItem(str(row.get("Выполнено", 0))))
-                self.geo_table.setItem(i, 4, QTableWidgetItem(str(row.get("В работе", 0))))
+                self.geo_table.setItem(i, 3, QTableWidgetItem(str(row.get('Выполнено', 0))))
+                self.geo_table.setItem(i, 4, QTableWidgetItem(str(row.get('В работе', 0))))
                 self.geo_table.setItem(i, 5, QTableWidgetItem(f"{row.get('Бэклог %', 0):.1f}%"))
             
-            self.geo_plot.clear()
-            if len(data) > 0:
-                names = data[name_col].head(10).tolist()
-                values = data["Всего"].head(10).tolist()
-                
+            if len(counts) > 0:
                 bars = pg.BarGraphItem(
-                    x=np.arange(len(names)),
-                    height=values,
+                    x=np.arange(len(counts)),
+                    height=counts['Всего'].values,
                     width=0.6,
-                    brush=pg.mkBrush(0, 120, 215)
+                    brush=pg.mkBrush(settings.get('main_color', '#1F4E79'))
                 )
                 self.geo_plot.addItem(bars)
-                self.geo_plot.getAxis('bottom').setTicks([[(i, name[:12]) for i, name in enumerate(names)]])
-                self.geo_plot.setXRange(-0.5, len(names) - 0.5)
-                self.geo_plot.setLabel('left', 'Количество')
                 
+                ticks = [[(i, str(name)[:12]) for i, name in enumerate(counts[name_col].values)]]
+                self.geo_plot.getAxis('bottom').setTicks(ticks)
+                self.geo_plot.setXRange(-0.5, len(counts) - 0.5)
+                self.geo_plot.setLabel('left', settings.get('y_label', 'Количество'))
+                self.geo_plot.setLabel('bottom', settings.get('x_label', name_col))
+            
+            # Применяем остальные настройки
+            self._apply_chart_settings(self.geo_plot, 'geography_chart', settings)
+            
+            self.log.debug("← update_geography() завершён")
+            
         except Exception as e:
-            print(f"⚠️ Update geography error: {e}")
+            self.log.error(f"⚠️ Ошибка обновления географии: {e}")
+            traceback.print_exc()
     
-    # ─── Аналитика "Мусор" ──────────────────────────────────────────────────
+    # ─── МУСОР ─────────────────────────────────────────────────────────────
     
     def _build_trash(self, df):
         """Строит аналитику по мусору"""
+        self.log.debug("→ _build_trash()")
+        
         try:
-            top_count, top_backlog = get_trash_analysis(df)
+            self.trash_plot.clear()
+            
+            if 'omsu' not in df.columns or 'category' not in df.columns:
+                self.log.warning("⚠️ Нет колонок omsu или category")
+                text = pg.TextItem("Нет данных", color=(150, 150, 150))
+                self.trash_plot.addItem(text)
+                return
+            
+            settings = self.chart_settings.get('trash_chart', {})
+            
+            trash_keywords = ['мусор', 'свалк', 'сток', 'отход']
+            mask = df['category'].str.contains('|'.join(trash_keywords), case=False, na=False)
+            trash_df = df[mask].copy()
+            
+            if len(trash_df) == 0:
+                self.log.warning("⚠️ Нет данных по мусору")
+                text = pg.TextItem("Нет данных по мусору", color=(150, 150, 150))
+                self.trash_plot.addItem(text)
+                return
+            
+            counts = trash_df['omsu'].value_counts().reset_index()
+            counts.columns = ['ОМСУ', 'Всего']
+            counts['Доля %'] = (counts['Всего'] / counts['Всего'].sum() * 100).round(1)
+            
+            if 'status' in trash_df.columns:
+                done = trash_df[trash_df['status'] == 'выполнено']['omsu'].value_counts()
+                in_progress = trash_df[trash_df['status'] == 'в работе']['omsu'].value_counts()
+                counts['Выполнено'] = counts['ОМСУ'].map(done).fillna(0).astype(int)
+                counts['В работе'] = counts['ОМСУ'].map(in_progress).fillna(0).astype(int)
+            else:
+                counts['Выполнено'] = 0
+                counts['В работе'] = 0
+            
+            counts['Бэклог %'] = (counts['В работе'] / counts['Всего'].replace(0, pd.NA) * 100).round(1).fillna(0.0)
+            
+            top_count = counts.sort_values('Всего', ascending=False).reset_index(drop=True)
+            top_backlog = counts.sort_values('Бэклог %', ascending=False).reset_index(drop=True)
+            
+            # Применяем лимит
+            limit = settings.get('limit', 10) or 10
+            top_count = top_count.head(limit)
+            top_backlog = top_backlog.head(limit)
+            
+            # Применяем сортировку для таблиц
+            sort_order = settings.get('sort_order', 'По убыванию')
+            if sort_order == 'По возрастанию':
+                top_count = top_count.sort_values('Всего', ascending=True)
+                top_backlog = top_backlog.sort_values('Бэклог %', ascending=True)
             
             self.trash_count_table.setRowCount(len(top_count))
             for i, row in top_count.iterrows():
-                self.trash_count_table.setItem(i, 0, QTableWidgetItem(str(row["ОМСУ"])))
-                self.trash_count_table.setItem(i, 1, QTableWidgetItem(str(row["Всего"])))
+                self.trash_count_table.setItem(i, 0, QTableWidgetItem(str(row['ОМСУ'])))
+                self.trash_count_table.setItem(i, 1, QTableWidgetItem(str(row['Всего'])))
                 self.trash_count_table.setItem(i, 2, QTableWidgetItem(f"{row['Доля %']:.1f}%"))
-                self.trash_count_table.setItem(i, 3, QTableWidgetItem(str(row.get("Выполнено", 0))))
-                self.trash_count_table.setItem(i, 4, QTableWidgetItem(str(row.get("В работе", 0))))
+                self.trash_count_table.setItem(i, 3, QTableWidgetItem(str(row.get('Выполнено', 0))))
+                self.trash_count_table.setItem(i, 4, QTableWidgetItem(str(row.get('В работе', 0))))
                 self.trash_count_table.setItem(i, 5, QTableWidgetItem(f"{row.get('Бэклог %', 0):.1f}%"))
             
             self.trash_backlog_table.setRowCount(len(top_backlog))
             for i, row in top_backlog.iterrows():
-                self.trash_backlog_table.setItem(i, 0, QTableWidgetItem(str(row["ОМСУ"])))
-                self.trash_backlog_table.setItem(i, 1, QTableWidgetItem(str(row["Всего"])))
+                self.trash_backlog_table.setItem(i, 0, QTableWidgetItem(str(row['ОМСУ'])))
+                self.trash_backlog_table.setItem(i, 1, QTableWidgetItem(str(row['Всего'])))
                 self.trash_backlog_table.setItem(i, 2, QTableWidgetItem(f"{row['Доля %']:.1f}%"))
-                self.trash_backlog_table.setItem(i, 3, QTableWidgetItem(str(row.get("Выполнено", 0))))
-                self.trash_backlog_table.setItem(i, 4, QTableWidgetItem(str(row.get("В работе", 0))))
+                self.trash_backlog_table.setItem(i, 3, QTableWidgetItem(str(row.get('Выполнено', 0))))
+                self.trash_backlog_table.setItem(i, 4, QTableWidgetItem(str(row.get('В работе', 0))))
                 self.trash_backlog_table.setItem(i, 5, QTableWidgetItem(f"{row.get('Бэклог %', 0):.1f}%"))
             
-            self.trash_plot.clear()
+            # График - топ по числу обращений
             if len(top_count) > 0:
-                names = top_count["ОМСУ"].head(10).tolist()
-                values = top_count["Всего"].head(10).tolist()
                 bars = pg.BarGraphItem(
-                    x=np.arange(len(names)),
-                    height=values,
+                    x=np.arange(len(top_count)),
+                    height=top_count['Всего'].values,
                     width=0.6,
-                    brush=pg.mkBrush(220, 53, 69)
+                    brush=pg.mkBrush(settings.get('main_color', '#dc3545'))
                 )
                 self.trash_plot.addItem(bars)
-                self.trash_plot.getAxis('bottom').setTicks([[(i, name[:12]) for i, name in enumerate(names)]])
-                self.trash_plot.setXRange(-0.5, len(names) - 0.5)
-                self.trash_plot.setLabel('left', 'Количество')
-                self.trash_plot.setTitle('Топ ОМСУ по обращениям "Мусор, свалки, стоки"')
                 
+                ticks = [[(i, str(name)[:12]) for i, name in enumerate(top_count['ОМСУ'].values)]]
+                self.trash_plot.getAxis('bottom').setTicks(ticks)
+                self.trash_plot.setXRange(-0.5, len(top_count) - 0.5)
+                self.trash_plot.setLabel('left', settings.get('y_label', 'Количество'))
+                self.trash_plot.setLabel('bottom', settings.get('x_label', 'ОМСУ'))
+                self.trash_plot.setTitle('Топ ОМСУ по обращениям "Мусор, свалки, стоки"')
+            
+            # Применяем остальные настройки
+            self._apply_chart_settings(self.trash_plot, 'trash_chart', settings)
+            
+            self.log.info(f"✅ Аналитика мусора построена: {len(top_count)} записей")
+            
         except Exception as e:
-            print(f"⚠️ Trash analysis error: {e}")
+            self.log.error(f"⚠️ Ошибка аналитики мусора: {e}")
+            traceback.print_exc()
+            text = pg.TextItem(f"Ошибка: {str(e)[:30]}", color=(200, 50, 50))
+            self.trash_plot.addItem(text)
     
     # ─── ЭКСПОРТ ──────────────────────────────────────────────────────────
     
     def export_report(self):
         """Экспортирует отчёт"""
+        self.log.debug("→ export_report()")
+        
         try:
             if self.filtered_data is None or len(self.filtered_data) == 0:
+                self.log.warning("⚠️ Нет данных для экспорта")
                 return
             
             path, _ = QFileDialog.getSaveFileName(
                 self, "Сохранить отчёт", "eco_report.xlsx", "Excel (*.xlsx)"
             )
             if not path:
+                self.log.warning("❌ Экспорт отменён")
                 return
             
             self.filtered_data.to_excel(path, index=False)
+            self.log.info(f"✅ Отчёт сохранён: {path}")
             QMessageBox.information(self, "Успех", f"Отчёт сохранён:\n{path}")
             
         except Exception as e:
+            self.log.error(f"❌ Ошибка экспорта: {e}")
+            traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить отчёт:\n{str(e)}")
     
     def go_back(self):
-        """Возвращает на стартовый экран"""
+        self.log.info("⬅️ Возврат")
         self.back_clicked.emit()
