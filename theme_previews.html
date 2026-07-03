@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Ecology-BI — Темы</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0e1117;
+  color: #e2e8f0;
+  padding: 40px;
+  min-height: 100vh;
+}
+h1 {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 40px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ─── Theme Card ─────────────────────────────────────── */
+.card {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.07);
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  transition: transform .2s, box-shadow .2s;
+}
+.card:hover { transform: translateY(-4px); box-shadow: 0 28px 70px rgba(0,0,0,.6); }
+
+.card-label {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  color: #94a3b8;
+}
+
+/* ─── Mini Dashboard Mockup ─────────────────────────── */
+.dash {
+  width: 100%;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Toolbar */
+.dash-toolbar {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.dash-toolbar .dot { width: 8px; height: 8px; border-radius: 50%; }
+.tb-btn {
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0;
+  flex-shrink: 0;
+}
+
+/* Grid body */
+.dash-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  min-height: 0;
+}
+
+/* Widgets */
+.w {
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.w-title {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  opacity: .55;
+}
+.w-kpi .kpi-val {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: auto;
+}
+.w-kpi .kpi-sub {
+  font-size: 6px;
+  opacity: .4;
+  margin-top: 3px;
+}
+
+/* Mini bar chart */
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  flex: 1;
+  min-height: 0;
+}
+.bar { flex: 1; border-radius: 2px 2px 0 0; min-width: 0; }
+
+/* Mini line chart */
+.line-wrap { flex: 1; min-height: 0; position: relative; }
+.line-wrap svg { width: 100%; height: 100%; overflow: visible; }
+
+/* Mini table */
+.tbl { font-size: 6px; width: 100%; border-collapse: collapse; }
+.tbl th { opacity: .5; font-weight: 700; padding: 2px 3px; text-align: left; border-bottom: 1px solid currentColor; opacity: .15; }
+.tbl td { padding: 2px 3px; opacity: .7; }
+.tbl tr:nth-child(even) td { opacity: .5; }
+
+/* Wide cell (spans 2 cols) */
+.w-wide { grid-column: span 2; }
+
+/* ════════════════════════════════════════
+   THEME 1: Emerald (current / default)
+═══════════════════════════════════════════ */
+.t-emerald .dash { background: #0d1117; }
+.t-emerald .dash-toolbar { background: #161b22; border-bottom: 1px solid #21262d; }
+.t-emerald .dot:nth-child(1) { background:#ff5f57; }
+.t-emerald .dot:nth-child(2) { background:#febc2e; }
+.t-emerald .dot:nth-child(3) { background:#28c840; }
+.t-emerald .tb-btn { background:#21262d; width:36px; }
+.t-emerald .tb-btn.acc { background:#166534; width:54px; }
+.t-emerald .w { background: #161b22; border: 1px solid #21262d; }
+.t-emerald .w-title { color: #8b949e; }
+.t-emerald .kpi-val { color: #4ade80; }
+.t-emerald .kpi-sub { color: #8b949e; }
+.t-emerald .bar { background: #4ade80; }
+.t-emerald .bar:nth-child(2) { opacity:.7; }
+.t-emerald .bar:nth-child(3) { opacity:.5; }
+.t-emerald .bar:nth-child(4) { opacity:.85; }
+.t-emerald .bar:nth-child(5) { opacity:.4; }
+.t-emerald .line-wrap svg polyline { stroke: #4ade80; }
+.t-emerald .line-wrap svg polygon  { fill: #4ade80; }
+.t-emerald .tbl { color: #e6edf3; }
+
+/* ════════════════════════════════════════
+   THEME 2: Ocean
+═══════════════════════════════════════════ */
+.t-ocean .dash { background: #050d1a; }
+.t-ocean .dash-toolbar { background: #0a1628; border-bottom: 1px solid #112240; }
+.t-ocean .dot:nth-child(1) { background:#ff5f57; }
+.t-ocean .dot:nth-child(2) { background:#febc2e; }
+.t-ocean .dot:nth-child(3) { background:#28c840; }
+.t-ocean .tb-btn { background:#112240; width:36px; }
+.t-ocean .tb-btn.acc { background:#0c4a6e; width:54px; }
+.t-ocean .w { background: #0a1628; border: 1px solid #112240; }
+.t-ocean .w-title { color: #64748b; }
+.t-ocean .kpi-val { color: #38bdf8; }
+.t-ocean .kpi-sub { color: #64748b; }
+.t-ocean .bar { background: #0ea5e9; }
+.t-ocean .bar:nth-child(2) { opacity:.7; }
+.t-ocean .bar:nth-child(3) { opacity:.5; }
+.t-ocean .bar:nth-child(4) { opacity:.85; }
+.t-ocean .bar:nth-child(5) { opacity:.4; }
+.t-ocean .line-wrap svg polyline { stroke: #38bdf8; }
+.t-ocean .line-wrap svg polygon  { fill: #38bdf8; }
+.t-ocean .tbl { color: #cbd5e1; }
+
+/* ════════════════════════════════════════
+   THEME 3: Midnight (фиолетовый)
+═══════════════════════════════════════════ */
+.t-midnight .dash { background: #0c0a1e; }
+.t-midnight .dash-toolbar { background: #13103a; border-bottom: 1px solid #1e1b4b; }
+.t-midnight .dot:nth-child(1) { background:#ff5f57; }
+.t-midnight .dot:nth-child(2) { background:#febc2e; }
+.t-midnight .dot:nth-child(3) { background:#28c840; }
+.t-midnight .tb-btn { background:#1e1b4b; width:36px; }
+.t-midnight .tb-btn.acc { background:#4c1d95; width:54px; }
+.t-midnight .w { background: #13103a; border: 1px solid #1e1b4b; }
+.t-midnight .w-title { color: #7c6fcd; }
+.t-midnight .kpi-val { color: #a78bfa; }
+.t-midnight .kpi-sub { color: #6d5fad; }
+.t-midnight .bar { background: #7c3aed; }
+.t-midnight .bar:nth-child(2) { background:#a78bfa; opacity:.8; }
+.t-midnight .bar:nth-child(3) { background:#c4b5fd; opacity:.5; }
+.t-midnight .bar:nth-child(4) { background:#7c3aed; opacity:.9; }
+.t-midnight .bar:nth-child(5) { background:#a78bfa; opacity:.4; }
+.t-midnight .line-wrap svg polyline { stroke: #a78bfa; }
+.t-midnight .line-wrap svg polygon  { fill: #7c3aed; }
+.t-midnight .tbl { color: #e2e8f0; }
+
+/* ════════════════════════════════════════
+   THEME 4: Sunset (тёмно-оранжевый)
+═══════════════════════════════════════════ */
+.t-sunset .dash { background: #110800; }
+.t-sunset .dash-toolbar { background: #1a1000; border-bottom: 1px solid #2d1a00; }
+.t-sunset .dot:nth-child(1) { background:#ff5f57; }
+.t-sunset .dot:nth-child(2) { background:#febc2e; }
+.t-sunset .dot:nth-child(3) { background:#28c840; }
+.t-sunset .tb-btn { background:#2d1a00; width:36px; }
+.t-sunset .tb-btn.acc { background:#7c2d12; width:54px; }
+.t-sunset .w { background: #1c1208; border: 1px solid #2d1a00; }
+.t-sunset .w-title { color: #92400e; }
+.t-sunset .kpi-val { color: #fb923c; }
+.t-sunset .kpi-sub { color: #78350f; }
+.t-sunset .bar { background: #ea580c; }
+.t-sunset .bar:nth-child(2) { background:#f97316; opacity:.8; }
+.t-sunset .bar:nth-child(3) { background:#fb923c; opacity:.55; }
+.t-sunset .bar:nth-child(4) { background:#ea580c; opacity:.9; }
+.t-sunset .bar:nth-child(5) { background:#f97316; opacity:.45; }
+.t-sunset .line-wrap svg polyline { stroke: #fb923c; }
+.t-sunset .line-wrap svg polygon  { fill: #ea580c; }
+.t-sunset .tbl { color: #fed7aa; }
+
+/* ════════════════════════════════════════
+   THEME 5: Arctic (светлая)
+═══════════════════════════════════════════ */
+.t-arctic .dash { background: #f0f5fb; }
+.t-arctic .dash-toolbar { background: #ffffff; border-bottom: 1px solid #e2eaf3; }
+.t-arctic .dot:nth-child(1) { background:#ff5f57; }
+.t-arctic .dot:nth-child(2) { background:#febc2e; }
+.t-arctic .dot:nth-child(3) { background:#28c840; }
+.t-arctic .tb-btn { background:#e2eaf3; width:36px; }
+.t-arctic .tb-btn.acc { background:#0369a1; width:54px; }
+.t-arctic .w { background: #ffffff; border: 1px solid #e2eaf3; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.t-arctic .w-title { color: #64748b; }
+.t-arctic .kpi-val { color: #0284c7; }
+.t-arctic .kpi-sub { color: #94a3b8; }
+.t-arctic .bar { background: #0ea5e9; }
+.t-arctic .bar:nth-child(2) { background:#38bdf8; opacity:.75; }
+.t-arctic .bar:nth-child(3) { background:#7dd3fc; opacity:.55; }
+.t-arctic .bar:nth-child(4) { background:#0ea5e9; opacity:.88; }
+.t-arctic .bar:nth-child(5) { background:#38bdf8; opacity:.42; }
+.t-arctic .line-wrap svg polyline { stroke: #0284c7; }
+.t-arctic .line-wrap svg polygon  { fill: #0ea5e9; }
+.t-arctic .tbl { color: #1e293b; }
+.t-arctic .tbl th { border-bottom-color: #cbd5e1; opacity:1; color:#64748b; }
+
+/* ════════════════════════════════════════
+   THEME 6: Slate (корпоративный серый)
+═══════════════════════════════════════════ */
+.t-slate .dash { background: #0f172a; }
+.t-slate .dash-toolbar { background: #1e293b; border-bottom: 1px solid #334155; }
+.t-slate .dot:nth-child(1) { background:#ff5f57; }
+.t-slate .dot:nth-child(2) { background:#febc2e; }
+.t-slate .dot:nth-child(3) { background:#28c840; }
+.t-slate .tb-btn { background:#334155; width:36px; }
+.t-slate .tb-btn.acc { background:#1d4ed8; width:54px; }
+.t-slate .w { background: #1e293b; border: 1px solid #334155; }
+.t-slate .w-title { color: #64748b; }
+.t-slate .kpi-val { color: #60a5fa; }
+.t-slate .kpi-sub { color: #475569; }
+.t-slate .bar { background: #3b82f6; }
+.t-slate .bar:nth-child(2) { background:#60a5fa; opacity:.75; }
+.t-slate .bar:nth-child(3) { background:#93c5fd; opacity:.5; }
+.t-slate .bar:nth-child(4) { background:#3b82f6; opacity:.88; }
+.t-slate .bar:nth-child(5) { background:#60a5fa; opacity:.42; }
+.t-slate .line-wrap svg polyline { stroke: #60a5fa; }
+.t-slate .line-wrap svg polygon  { fill: #3b82f6; }
+.t-slate .tbl { color: #cbd5e1; }
+</style>
+</head>
+<body>
+
+<h1>Ecology-BI · Темы оформления</h1>
+<p class="subtitle">Выбери тему — она применится к конструктору и к статическому дашборду</p>
+
+<div class="grid">
+
+  <!-- 1: Emerald -->
+  <div>
+    <div class="card t-emerald">
+      <div class="dash">
+        <div class="dash-toolbar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div style="flex:1"></div>
+          <div class="tb-btn acc"></div>
+          <div class="tb-btn"></div>
+          <div class="tb-btn"></div>
+        </div>
+        <div class="dash-body">
+          <!-- KPI -->
+          <div class="w w-kpi">
+            <div class="w-title">Выполнено</div>
+            <div class="kpi-val">87%</div>
+            <div class="kpi-sub">↑ 3.2% за месяц</div>
+          </div>
+          <!-- Chart bars -->
+          <div class="w w-wide">
+            <div class="w-title">Обращения по месяцам</div>
+            <div class="bars">
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:72%"></div>
+            </div>
+          </div>
+          <!-- Line chart -->
+          <div class="w w-wide">
+            <div class="w-title">Динамика</div>
+            <div class="line-wrap">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ade80" stop-opacity=".3"/><stop offset="100%" stop-color="#4ade80" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="0,40 0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6 100,40" fill="url(#g1)"/>
+                <polyline points="0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+          <!-- Table -->
+          <div class="w">
+            <div class="w-title">Таблица</div>
+            <table class="tbl">
+              <tr><th>ОМСУ</th><th>Кол-во</th></tr>
+              <tr><td>Район 1</td><td>142</td></tr>
+              <tr><td>Район 2</td><td>98</td></tr>
+              <tr><td>Район 3</td><td>203</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">🌿 Emerald · текущая</div>
+  </div>
+
+  <!-- 2: Ocean -->
+  <div>
+    <div class="card t-ocean">
+      <div class="dash">
+        <div class="dash-toolbar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div style="flex:1"></div>
+          <div class="tb-btn acc"></div>
+          <div class="tb-btn"></div>
+          <div class="tb-btn"></div>
+        </div>
+        <div class="dash-body">
+          <div class="w w-kpi">
+            <div class="w-title">Выполнено</div>
+            <div class="kpi-val">87%</div>
+            <div class="kpi-sub">↑ 3.2% за месяц</div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Обращения по месяцам</div>
+            <div class="bars">
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:72%"></div>
+            </div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Динамика</div>
+            <div class="line-wrap">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8" stop-opacity=".3"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="0,40 0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6 100,40" fill="url(#g2)"/>
+                <polyline points="0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+          <div class="w">
+            <div class="w-title">Таблица</div>
+            <table class="tbl">
+              <tr><th>ОМСУ</th><th>Кол-во</th></tr>
+              <tr><td>Район 1</td><td>142</td></tr>
+              <tr><td>Район 2</td><td>98</td></tr>
+              <tr><td>Район 3</td><td>203</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">🌊 Ocean</div>
+  </div>
+
+  <!-- 3: Midnight -->
+  <div>
+    <div class="card t-midnight">
+      <div class="dash">
+        <div class="dash-toolbar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div style="flex:1"></div>
+          <div class="tb-btn acc"></div>
+          <div class="tb-btn"></div>
+          <div class="tb-btn"></div>
+        </div>
+        <div class="dash-body">
+          <div class="w w-kpi">
+            <div class="w-title">Выполнено</div>
+            <div class="kpi-val">87%</div>
+            <div class="kpi-sub">↑ 3.2% за месяц</div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Обращения по месяцам</div>
+            <div class="bars">
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:72%"></div>
+            </div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Динамика</div>
+            <div class="line-wrap">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity=".3"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="0,40 0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6 100,40" fill="url(#g3)"/>
+                <polyline points="0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6" fill="none" stroke="#a78bfa" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+          <div class="w">
+            <div class="w-title">Таблица</div>
+            <table class="tbl">
+              <tr><th>ОМСУ</th><th>Кол-во</th></tr>
+              <tr><td>Район 1</td><td>142</td></tr>
+              <tr><td>Район 2</td><td>98</td></tr>
+              <tr><td>Район 3</td><td>203</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">🌌 Midnight</div>
+  </div>
+
+  <!-- 4: Sunset -->
+  <div>
+    <div class="card t-sunset">
+      <div class="dash">
+        <div class="dash-toolbar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div style="flex:1"></div>
+          <div class="tb-btn acc"></div>
+          <div class="tb-btn"></div>
+          <div class="tb-btn"></div>
+        </div>
+        <div class="dash-body">
+          <div class="w w-kpi">
+            <div class="w-title">Выполнено</div>
+            <div class="kpi-val">87%</div>
+            <div class="kpi-sub">↑ 3.2% за месяц</div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Обращения по месяцам</div>
+            <div class="bars">
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:72%"></div>
+            </div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Динамика</div>
+            <div class="line-wrap">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c" stop-opacity=".3"/><stop offset="100%" stop-color="#fb923c" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="0,40 0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6 100,40" fill="url(#g4)"/>
+                <polyline points="0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6" fill="none" stroke="#fb923c" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+          <div class="w">
+            <div class="w-title">Таблица</div>
+            <table class="tbl">
+              <tr><th>ОМСУ</th><th>Кол-во</th></tr>
+              <tr><td>Район 1</td><td>142</td></tr>
+              <tr><td>Район 2</td><td>98</td></tr>
+              <tr><td>Район 3</td><td>203</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">🌅 Sunset</div>
+  </div>
+
+  <!-- 5: Arctic -->
+  <div>
+    <div class="card t-arctic">
+      <div class="dash">
+        <div class="dash-toolbar" style="border-bottom:1px solid #e2eaf3;">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div style="flex:1"></div>
+          <div class="tb-btn acc" style="border-radius:4px;"></div>
+          <div class="tb-btn"></div>
+          <div class="tb-btn"></div>
+        </div>
+        <div class="dash-body">
+          <div class="w w-kpi">
+            <div class="w-title">Выполнено</div>
+            <div class="kpi-val">87%</div>
+            <div class="kpi-sub">↑ 3.2% за месяц</div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Обращения по месяцам</div>
+            <div class="bars">
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:72%"></div>
+            </div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Динамика</div>
+            <div class="line-wrap">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs><linearGradient id="g5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0ea5e9" stop-opacity=".2"/><stop offset="100%" stop-color="#0ea5e9" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="0,40 0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6 100,40" fill="url(#g5)"/>
+                <polyline points="0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6" fill="none" stroke="#0284c7" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+          <div class="w">
+            <div class="w-title">Таблица</div>
+            <table class="tbl" style="color:#1e293b;">
+              <tr><th style="color:#64748b;opacity:1;border-bottom:1px solid #cbd5e1;">ОМСУ</th><th style="color:#64748b;opacity:1;border-bottom:1px solid #cbd5e1;">Кол-во</th></tr>
+              <tr><td>Район 1</td><td>142</td></tr>
+              <tr><td style="opacity:.6;">Район 2</td><td style="opacity:.6;">98</td></tr>
+              <tr><td>Район 3</td><td>203</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">❄️ Arctic · светлая</div>
+  </div>
+
+  <!-- 6: Slate -->
+  <div>
+    <div class="card t-slate">
+      <div class="dash">
+        <div class="dash-toolbar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div style="flex:1"></div>
+          <div class="tb-btn acc"></div>
+          <div class="tb-btn"></div>
+          <div class="tb-btn"></div>
+        </div>
+        <div class="dash-body">
+          <div class="w w-kpi">
+            <div class="w-title">Выполнено</div>
+            <div class="kpi-val">87%</div>
+            <div class="kpi-sub">↑ 3.2% за месяц</div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Обращения по месяцам</div>
+            <div class="bars">
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:72%"></div>
+            </div>
+          </div>
+          <div class="w w-wide">
+            <div class="w-title">Динамика</div>
+            <div class="line-wrap">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+                <defs><linearGradient id="g6" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#60a5fa" stop-opacity=".3"/><stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="0,40 0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6 100,40" fill="url(#g6)"/>
+                <polyline points="0,30 15,22 30,26 45,14 60,18 75,8 90,12 100,6" fill="none" stroke="#60a5fa" stroke-width="1.5"/>
+              </svg>
+            </div>
+          </div>
+          <div class="w">
+            <div class="w-title">Таблица</div>
+            <table class="tbl">
+              <tr><th>ОМСУ</th><th>Кол-во</th></tr>
+              <tr><td>Район 1</td><td>142</td></tr>
+              <tr><td>Район 2</td><td>98</td></tr>
+              <tr><td>Район 3</td><td>203</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">🔷 Slate · корпоративный</div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "version": "2.0",
+  "name": "тестовое",
+  "created_at": "2026-07-01T03:18:26.887572",
+  "pages": [
+    {
+      "name": "Страница 1",
+      "rows": 2,
+      "columns": 3,
+      "widgets": [
+        {
+          "id": "widget_1",
+          "type": "chart",
+          "row": 0,
+          "col": 0,
+          "row_span": 1,
+          "col_span": 1,
+          "settings": {
+            "chart_style": "bar",
+            "color": "#5282FF",
+            "data_source": "by_category",
+            "dataset_name": "eco_data_50k",
+            "max_items": 15,
+            "show_grid": true,
+            "show_values": true,
+            "title": "По видам нарушений"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "version": "2.0",
+  "name": "Тестовок 3",
+  "created_at": "2026-07-01T17:55:45.115603",
+  "pages": [
+    {
+      "name": "Страница 1",
+      "rows": 2,
+      "columns": 3,
+      "widgets": [
+        {
+          "id": "widget_1",
+          "type": "chart",
+          "row": 0,
+          "col": 0,
+          "row_span": 1,
+          "col_span": 1,
+          "settings": {
+            "chart_style": "bar",
+            "color": "#38BDF8",
+            "data_source": "time_series_W",
+            "dataset_name": "eco_data_50k",
+            "max_items": 15,
+            "show_grid": true,
+            "show_values": false,
+            "title": "Динамика по неделям"
+          }
+        },
+        {
+          "id": "widget_2",
+          "type": "table",
+          "row": 0,
+          "col": 1,
+          "row_span": 1,
+          "col_span": 1,
+          "settings": {
+            "data_source": "by_mro",
+            "dataset_name": "eco_data_50k",
+            "limit": 50,
+            "max_items": 15,
+            "title": "По МРО"
+          }
+        },
+        {
+          "id": "widget_3",
+          "type": "kpi",
+          "row": 0,
+          "col": 2,
+          "row_span": 1,
+          "col_span": 1,
+          "settings": {
+            "color": "#0284C7",
+            "dataset_name": "eco_data_50k",
+            "font_size": 36,
+            "metric": "omsu_count",
+            "title": "Количество районов",
+            "value": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Страница 2",
+      "rows": 2,
+      "columns": 3,
+      "widgets": [
+        {
+          "id": "widget_1",
+          "type": "kpi",
+          "row": 0,
+          "col": 0,
+          "row_span": 1,
+          "col_span": 1,
+          "settings": {
+            "color": "#0284C7",
+            "dataset_name": "eco_data_50k",
+            "font_size": 36,
+            "metric": "done",
+            "title": "Выполнено",
+            "value": ""
+          }
+        }
+      ]
+    }
+  ]
+}
