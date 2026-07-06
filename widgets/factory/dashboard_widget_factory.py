@@ -3,7 +3,14 @@ from widgets.dashboard.base_widget import BaseDashboardWidget
 from widgets.dashboard.kpi_widget import KPIWidget
 from widgets.dashboard.chart_widget import ChartWidget
 from widgets.dashboard.table_widget import TableWidget
-from widgets.dashboard.map_widget import MapWidget
+
+# BUG 2 FIX: import stub widgets so gauge/progress/pivot types are registered
+from widgets.dashboard.stub_widgets import GaugeWidget, ProgressWidget, PivotWidget
+
+try:
+    from widgets.dashboard.map_widget import MapWidget
+except ImportError:
+    MapWidget = None
 
 try:
     from widgets.dashboard.text_widget import TextWidget
@@ -20,13 +27,18 @@ class DashboardWidgetFactory:
     """Фабрика для создания виджетов дашборда."""
 
     _registry = {
-        'kpi':   KPIWidget,
-        'chart': ChartWidget,
-        'table': TableWidget,
-        'map':   MapWidget,
+        'kpi':      KPIWidget,
+        'chart':    ChartWidget,
+        'table':    TableWidget,
+        # BUG 2 FIX: register stub widget types so they can be created
+        'gauge':    GaugeWidget,
+        'progress': ProgressWidget,
+        'pivot':    PivotWidget,
     }
 
     # Регистрируем только доступные виджеты
+    if MapWidget is not None:
+        _registry['map'] = MapWidget
     if TextWidget is not None:
         _registry['text'] = TextWidget
     if ImageWidget is not None:
@@ -38,7 +50,8 @@ class DashboardWidgetFactory:
         Создаёт виджет заданного типа.
 
         Args:
-            widget_type: Тип виджета ('kpi', 'chart', 'table', 'text', 'image', 'map')
+            widget_type: Тип виджета ('kpi', 'chart', 'table', 'text', 'image',
+                         'map', 'gauge', 'progress', 'pivot')
             settings: Настройки виджета
 
         Returns:

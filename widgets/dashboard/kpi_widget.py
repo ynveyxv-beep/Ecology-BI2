@@ -1,4 +1,5 @@
 # widgets/dashboard/kpi_widget.py
+import math
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QVBoxLayout, QLabel
 
@@ -23,7 +24,7 @@ class KPIWidget(BaseDashboardWidget):
     Настройки:
         metric      (str)  — ключ из KPI_METRICS; 'manual' = ручной ввод
         title       (str)  — подпись под значением
-        value       (str)  — значение при metric='manual'
+        value       (str)  — значение при metric='manual' (поддерживает любые строки)
         unit        (str)  — единица измерения (мкг/м³, шт. и т.д.)
         color       (str)  — цвет значения, HEX
         font_size   (int)  — размер шрифта значения
@@ -53,7 +54,8 @@ class KPIWidget(BaseDashboardWidget):
     def _apply_settings(self):
         metric    = self._settings.get('metric', 'manual')
         color     = self._settings.get('color', '#38BDF8')
-        font_size = self._settings.get('font_size', 28)
+        font_size = self._settings.get('font_size', 36)
+        # BUG 1 FIX: always read 'unit' from settings so it appears on the card
         unit      = self._settings.get('unit', '')
 
         value = self._resolve_value(metric)
@@ -64,11 +66,13 @@ class KPIWidget(BaseDashboardWidget):
 
         self._no_data_label.hide()
         self._value_label.show()
+        # BUG 1 FIX: display value as-is (supports plain text strings, not just numbers)
         self._value_label.setText(str(value))
         self._value_label.setStyleSheet(
             f"font-size: {font_size}px; font-weight: bold; color: {color};"
         )
 
+        # BUG 1 FIX: always show unit label when unit is non-empty
         if unit:
             self._unit_label.setText(unit)
             self._unit_label.setStyleSheet(
@@ -82,6 +86,8 @@ class KPIWidget(BaseDashboardWidget):
     def _resolve_value(self, metric: str):
         """Возвращает значение для отображения или None если данных нет."""
         if metric == 'manual' or not metric:
+            # BUG 1 FIX: return raw value string without forcing numeric conversion —
+            # this allows text format (arbitrary strings) to be displayed correctly.
             return self._settings.get('value', '—')
 
         if metric == 'column':
@@ -104,11 +110,11 @@ class KPIWidget(BaseDashboardWidget):
                     elif agg == 'last':   val = col.iloc[-1] if len(col) > 0 else '—'
                     else:                 val = col.sum()
                     # Убираем .0 у целых чисел
-                    if isinstance(val, float) and val == int(val):
+                    if isinstance(val, float) and math.isfinite(val) and val == int(val):
                         val = int(val)
                     return str(val)
                 except Exception as e:
-                    print(f"⚠️ KPIWidget: ошибка вычисления '{agg}' для '{col_name}': {e}")
+                    print(f"KPIWidget: ошибка вычисления '{agg}' для '{col_name}': {e}")
                     return '—'
             return None  # Данные ещё не загружены
 
@@ -119,8 +125,13 @@ class KPIWidget(BaseDashboardWidget):
                 kpi = get_kpi(self._df)
                 return kpi.get(metric, '—')
             except Exception as e:
-                print(f"⚠️ KPIWidget: ошибка получения метрики '{metric}': {e}")
+                print(f"KPIWidget: ошибка получения метрики '{metric}': {e}")
                 return '—'
 
         # Данные ещё не загружены — показываем плейсхолдер
         return None
+
+    def settings(self) -> dict:
+        # BUG 1 FIX: return a full copy including 'unit' so the edit dialog
+        # pre-fills correctly and never shows wrong/missing values.
+        return self._settings.copy()

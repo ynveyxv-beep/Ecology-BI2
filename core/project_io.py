@@ -18,7 +18,7 @@ class ProjectIO:
         }
         
         if df is not None:
-            data["dataset"] = df.to_json(orient="split")
+            data["dataset"] = df.replace([float('inf'), float('-inf')], None).fillna('').to_json(orient='split')
         
         for item in items:
             item_data = {
@@ -39,12 +39,14 @@ class ProjectIO:
     @staticmethod
     def load(path: str):
         """Загружает проект из JSON"""
-        
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        
-        df = None
-        if data.get("dataset"):
-            df = pd.read_json(data["dataset"], orient="split")
-        
-        return data, df
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            df = None
+            if data.get("dataset"):
+                df = pd.read_json(data["dataset"], orient="split")
+
+            return data, df
+        except Exception as e:
+            raise RuntimeError(f"Не удалось загрузить проект из {path}: {e}") from e

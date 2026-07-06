@@ -271,8 +271,9 @@ class ChartWidget(BaseDashboardWidget):
                 rotation=35, ha='right', fontsize=7
             )
         elif style in ('line', 'area'):
-            ax.set_xticks(x[::max(1, len(x) // 6)])
-            ax.set_xticklabels(labels[::max(1, len(labels) // 6)],
+            step = max(1, len(labels) // 6)
+            ax.set_xticks(x[::step])
+            ax.set_xticklabels(labels[::step],
                                rotation=30, ha='right', fontsize=7)
 
         if title:

@@ -355,8 +355,8 @@ class DataPanel(QDialog):
 
         thread = self._threads.pop(path, None)
         if thread and thread.isRunning():
-            thread.quit()
-            thread.wait(300)
+            thread.requestInterruption()
+            thread.wait()
 
         if not self._file_rows:
             self._empty_lbl.show()

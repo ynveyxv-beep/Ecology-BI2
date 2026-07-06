@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QLabel, QFrame, QListWidget, QListWidgetItem, QMessageBox, QMenu
 )
 import os
-import sys
 import json
 
 from ui.theme import (
@@ -637,8 +636,11 @@ class StartScreen(QWidget):
     def _get_last_template_path(self) -> str | None:
         last_file = os.path.join(self._templates_dir_abs(), ".last_template")
         if os.path.exists(last_file):
-            with open(last_file, 'r', encoding='utf-8') as f:
-                return f.read().strip()
+            try:
+                with open(last_file, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+            except Exception:
+                return None
         return None
 
     def _save_last_template_path(self, path: str):
@@ -674,45 +676,25 @@ class StartScreen(QWidget):
     def _templates_dir_abs(self) -> str:
         """
         Возвращает папку для хранения дашбордов.
-        Всегда возвращает путь внутри пользовательского профиля —
-        никогда не пишет в Program Files.
-
-        Приоритет:
-          1. %APPDATA%\\Ecology-BI\\templates
-          2. %LOCALAPPDATA%\\Ecology-BI\\templates
-          3. ~/Documents/Ecology-BI/templates
-          4. ~/Ecology-BI/templates  (последний вариант)
+        Приоритет: %APPDATA%\\EcologyBI → ~/Documents/EcologyBI → project/templates/
         """
-        candidates = []
-
-        appdata = os.environ.get('APPDATA')
+        appdata = os.environ.get('APPDATA', '')
         if appdata:
-            candidates.append(os.path.join(appdata, 'Ecology-BI', 'templates'))
-
-        localappdata = os.environ.get('LOCALAPPDATA')
-        if localappdata:
-            candidates.append(os.path.join(localappdata, 'Ecology-BI', 'templates'))
-
-        home = os.path.expanduser('~')
-        candidates.append(os.path.join(home, 'Documents', 'Ecology-BI', 'templates'))
-        candidates.append(os.path.join(home, 'Ecology-BI', 'templates'))
-
-        for path in candidates:
+            path = os.path.join(appdata, 'EcologyBI')
             try:
                 os.makedirs(path, exist_ok=True)
-                # Проверяем что папка реально доступна для записи
-                test = os.path.join(path, '.write_test')
-                with open(test, 'w') as f:
-                    f.write('ok')
-                os.remove(test)
                 return path
             except Exception:
-                continue
-
-        # Абсолютный fallback — папка temp пользователя
-        tmp = os.path.join(os.environ.get('TEMP', home), 'Ecology-BI', 'templates')
-        os.makedirs(tmp, exist_ok=True)
-        return tmp
+                pass
+        docs = os.path.join(os.path.expanduser('~'), 'Documents', 'EcologyBI')
+        try:
+            os.makedirs(docs, exist_ok=True)
+            return docs
+        except Exception:
+            pass
+        return os.path.abspath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates')
+        )
 
     def _add_template_item(self, path: str, seen: set) -> bool:
         """Добавляет элемент в список. Возвращает True, если добавлен."""

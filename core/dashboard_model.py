@@ -49,7 +49,7 @@ class ChartConfig:
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'ChartConfig':
-        return cls(**data)
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
 @dataclass

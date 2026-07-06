@@ -365,6 +365,15 @@ class WidgetCreationDialog(QDialog):
         self._build_ui()
         self._select_type(self._current_type)
 
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            focused = self.focusWidget()
+            map_inputs = getattr(self, '_map_inputs', [])
+            if map_inputs and focused in map_inputs:
+                self._geocode_address()
+                return
+        super().keyPressEvent(event)
+
     # ─── Построение UI ─────────────────────────────────────────────────────
 
     def _build_ui(self):
@@ -656,6 +665,9 @@ class WidgetCreationDialog(QDialog):
             QPushButton:pressed {{ background:{ACCENT_DARK}; }}
         """)
         self._add_btn.clicked.connect(self._on_add)
+        # BUG 5 FIX: make this the default button so pressing Enter triggers it
+        self._add_btn.setDefault(True)
+        self._add_btn.setAutoDefault(True)
         root.addWidget(self._add_btn)
 
     # ─── Текстовый блок: поля ──────────────────────────────────────────────
@@ -803,6 +815,7 @@ class WidgetCreationDialog(QDialog):
         self._map_house_input = QLineEdit()
         self._map_house_input.setPlaceholderText("Дом")
         addr_grid.addWidget(self._map_house_input, 1)
+        self._map_inputs = [self._map_city_input, self._map_street_input, self._map_house_input]
         af_lay.addLayout(addr_grid)
 
         geo_row2 = QHBoxLayout(); geo_row2.setSpacing(8)

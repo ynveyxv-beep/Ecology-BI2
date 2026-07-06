@@ -261,9 +261,8 @@ class DatasetManager(QDialog):
         if new in self._datasets and new != old:
             QMessageBox.warning(self, "Имя занято", f"Датасет «{new}» уже существует.")
             return
-        df = self._datasets.pop(old)
-        # Пересобираем dict с сохранением порядка
-        self._datasets = {(new if k == old else k): v for k, v in {**self._datasets, new: df}.items()}
+        self._datasets = {(new if k == old else k): v for k, v in self._datasets.items()}
+        self._refresh()
         self.datasets_changed.emit(self._datasets)
 
     def _on_removed(self, name: str):

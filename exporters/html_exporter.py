@@ -121,7 +121,7 @@ def _svg_chart(color: str, style: str, values: list, labels: list,
         )
 
     elif style == 'scatter':
-        pts = [(int(20 + i * (W-40)/(len(values)-1)), int(H-8 - v/mx*(H-20)))
+        pts = [(int(20 + i * (W-40)/max(len(values)-1, 1)), int(H-8 - v/mx*(H-20)))
                for i, v in enumerate(values)]
         for x, y in pts:
             shapes += (
@@ -301,6 +301,109 @@ def _render_table(settings: dict, widget_id: str) -> str:
 </div>"""
 
 
+def _render_gauge(settings: dict, widget_id: str) -> str:
+    """SVG-дуга — круговой датчик 0-100%."""
+    title = _esc(settings.get('title', 'Датчик'))
+    color = settings.get('color', _C['accent'])
+    raw   = settings.get('value', '0')
+    try:
+        pct = max(0.0, min(100.0, float(raw)))
+    except (ValueError, TypeError):
+        pct = 0.0
+
+    size   = 120
+    cx, cy = size // 2, size // 2
+    r      = 46
+    stroke = 9
+    bg_color = '#334155'
+
+    start_angle = -135.0
+    sweep       = pct / 100.0 * 270.0
+
+    def arc_path(cx, cy, r, start_deg, sweep_deg):
+        import math as _m
+        sr = _m.radians(start_deg)
+        er = _m.radians(start_deg + sweep_deg)
+        x1 = cx + r * _m.cos(sr);  y1 = cy + r * _m.sin(sr)
+        x2 = cx + r * _m.cos(er);  y2 = cy + r * _m.sin(er)
+        large = 1 if abs(sweep_deg) > 180 else 0
+        sf    = 1 if sweep_deg > 0 else 0
+        return f"M {x1:.2f} {y1:.2f} A {r} {r} 0 {large} {sf} {x2:.2f} {y2:.2f}"
+
+    bg_path = arc_path(cx, cy, r, start_angle, 270)
+    fg_path = arc_path(cx, cy, r, start_angle, sweep) if pct > 0 else ''
+    fg_el   = (f'<path d="{fg_path}" fill="none" stroke="{color}" '
+               f'stroke-width="{stroke}" stroke-linecap="round"/>') if fg_path else ''
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
+        f'viewBox="0 0 {size} {size}">'
+        f'<path d="{bg_path}" fill="none" stroke="{bg_color}" '
+        f'stroke-width="{stroke}" stroke-linecap="round"/>'
+        f'{fg_el}'
+        f'<text x="{cx}" y="{cy + 6}" text-anchor="middle" '
+        f'font-family="sans-serif" font-size="20" font-weight="bold" '
+        f'fill="{color}">{pct:.0f}%</text>'
+        f'</svg>'
+    )
+
+    return f"""
+<div class="widget gauge-widget" id="{widget_id}">
+  <div class="widget-title">{title}</div>
+  <div class="gauge-wrap">{svg}</div>
+</div>"""
+
+
+def _render_progress(settings: dict, widget_id: str) -> str:
+    """Горизонтальный прогресс-бар."""
+    title = _esc(settings.get('title', 'Прогресс'))
+    color = settings.get('color', _C['accent'])
+    raw   = settings.get('value', '0')
+    try:
+        pct = max(0, min(100, int(float(raw))))
+    except (ValueError, TypeError):
+        pct = 0
+
+    bar_bg   = '#334155'
+    text_col = _C['text_pri']
+
+    return f"""
+<div class="widget progress-widget" id="{widget_id}">
+  <div class="widget-title">{title}</div>
+  <div class="progress-wrap">
+    <div class="progress-bar-bg" style="background:{bar_bg};border-radius:6px;height:22px;overflow:hidden;position:relative;">
+      <div style="width:{pct}%;height:100%;background:{color};border-radius:6px;transition:width .4s;"></div>
+      <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                   font-size:12px;font-weight:700;color:{text_col};pointer-events:none;">{pct}%</span>
+    </div>
+  </div>
+</div>"""
+
+
+def _render_pivot(settings: dict, widget_id: str) -> str:
+    """Сводная карточка — текстовые данные / placeholder."""
+    title = _esc(settings.get('title', 'Сводная'))
+    val   = settings.get('value', '')
+    color = settings.get('color', _C['accent'])
+    text_sec = _C['text_sec']
+
+    if val:
+        body = f'<div style="font-size:14px;color:{_C["text_pri"]};white-space:pre-wrap;">{_esc(val)}</div>'
+    else:
+        body = (
+            f'<div style="color:{text_sec};font-size:12px;text-align:center;padding:16px 0;">'
+            f'Данные сводной таблицы<br>'
+            f'<span style="color:{color};font-weight:600;">загружаются из датасета</span>'
+            f'</div>'
+        )
+
+    return f"""
+<div class="widget pivot-widget" id="{widget_id}">
+  <div class="widget-title">{title}</div>
+  <div class="pivot-body">{body}</div>
+</div>"""
+
+
 def _render_text(settings: dict, widget_id: str) -> str:
     content = _esc(settings.get('content', ''))
     fs      = settings.get('font_size', 14)
@@ -406,6 +509,12 @@ def _render_widget(w: dict, idx: int) -> str:
         return _render_image(settings, wid)
     elif wtype == 'map':
         return _render_map(settings, wid)
+    elif wtype == 'gauge':
+        return _render_gauge(settings, wid)
+    elif wtype == 'progress':
+        return _render_progress(settings, wid)
+    elif wtype == 'pivot':
+        return _render_pivot(settings, wid)
     else:
         return f'<div class="widget" id="w{idx}"><div class="widget-title">{_esc(wtype)}</div></div>'
 
@@ -422,22 +531,23 @@ def export_to_html(dashboard_data: dict, output_path: str,
     :param open_browser:   открыть файл в браузере после экспорта
     :returns: output_path
     """
+    C = dict(_C)
     # ── Применить тему ────────────────────────────────────────────────────────
     theme_name = dashboard_data.get('theme', 'ocean')
     try:
         from ui.theme import THEMES as _THEMES
         t = _THEMES.get(theme_name, _THEMES['ocean'])
-        _C['bg_deep']   = t['BG_DEEP']
-        _C['bg_dark']   = t['BG_DARK']
-        _C['bg_panel']  = t['BG_PANEL']
-        _C['bg_card']   = t['BG_CARD']
-        _C['bg_hover']  = t['BG_HOVER']
-        _C['border']    = t['BORDER']
-        _C['border_lt'] = t['BORDER_LT']
-        _C['accent']    = t['ACCENT']
-        _C['text_pri']  = t['TEXT_PRI']
-        _C['text_sec']  = t['TEXT_SEC']
-        _C['text_mut']  = t['TEXT_MUT']
+        C['bg_deep']   = t['BG_DEEP']
+        C['bg_dark']   = t['BG_DARK']
+        C['bg_panel']  = t['BG_PANEL']
+        C['bg_card']   = t['BG_CARD']
+        C['bg_hover']  = t['BG_HOVER']
+        C['border']    = t['BORDER']
+        C['border_lt'] = t['BORDER_LT']
+        C['accent']    = t['ACCENT']
+        C['text_pri']  = t['TEXT_PRI']
+        C['text_sec']  = t['TEXT_SEC']
+        C['text_mut']  = t['TEXT_MUT']
         global _CHART_PALETTE
         _CHART_PALETTE  = list(t.get('CHART_PALETTE', _CHART_PALETTE))
     except Exception:
@@ -526,17 +636,17 @@ def export_to_html(dashboard_data: dict, output_path: str,
 {leaflet_js}
 <style>
 :root {{
-  --bg-deep:   {_C['bg_deep']};
-  --bg-dark:   {_C['bg_dark']};
-  --bg-panel:  {_C['bg_panel']};
-  --bg-card:   {_C['bg_card']};
-  --bg-hover:  {_C['bg_hover']};
-  --border:    {_C['border']};
-  --border-lt: {_C['border_lt']};
-  --accent:    {_C['accent']};
-  --text-pri:  {_C['text_pri']};
-  --text-sec:  {_C['text_sec']};
-  --text-mut:  {_C['text_mut']};
+  --bg-deep:   {C['bg_deep']};
+  --bg-dark:   {C['bg_dark']};
+  --bg-panel:  {C['bg_panel']};
+  --bg-card:   {C['bg_card']};
+  --bg-hover:  {C['bg_hover']};
+  --border:    {C['border']};
+  --border-lt: {C['border_lt']};
+  --accent:    {C['accent']};
+  --text-pri:  {C['text_pri']};
+  --text-sec:  {C['text_sec']};
+  --text-mut:  {C['text_mut']};
 }}
 *,*::before,*::after {{ box-sizing:border-box; margin:0; padding:0; }}
 html,body {{ height:100%; background:var(--bg-deep); color:var(--text-pri); font-family:system-ui,'Segoe UI',sans-serif; }}
@@ -655,6 +765,19 @@ tr:hover td  {{ background:var(--bg-hover); }}
   border-radius: 4px;
 }}
 .img-placeholder {{ color:var(--text-mut); font-size:32px; }}
+
+/* ── Gauge ── */
+.gauge-widget {{ align-items:center; justify-content:center; text-align:center; }}
+.gauge-wrap   {{ display:flex; align-items:center; justify-content:center; flex:1; }}
+.gauge-wrap svg {{ display:block; }}
+
+/* ── Progress ── */
+.progress-widget {{ justify-content:center; }}
+.progress-wrap   {{ padding:4px 0; width:100%; }}
+
+/* ── Pivot ── */
+.pivot-widget {{ }}
+.pivot-body   {{ flex:1; overflow:auto; padding:4px 2px; line-height:1.7; }}
 
 /* ── Map ── */
 .map-widget {{ padding: 0; }}

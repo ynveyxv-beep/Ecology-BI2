@@ -4,6 +4,13 @@ from PySide6.QtWidgets import QLabel, QSizePolicy
 
 from widgets.dashboard.base_widget import BaseDashboardWidget
 
+# BUG 7 FIX: mapping from stored string key to Qt alignment flag
+_ALIGN_MAP = {
+    'left':   Qt.AlignLeft | Qt.AlignTop,
+    'center': Qt.AlignCenter,
+    'right':  Qt.AlignRight | Qt.AlignTop,
+}
+
 
 class TextWidget(BaseDashboardWidget):
     """Виджет для отображения произвольного текста."""
@@ -25,7 +32,14 @@ class TextWidget(BaseDashboardWidget):
         self._apply_settings()
 
     def _apply_settings(self):
-        """Применяет настройки."""
+        """
+        BUG 7 FIX:
+        - Alignment is now read as a string key and looked up in _ALIGN_MAP.
+          This prevents crashes from passing an int alignment value where a
+          string key is expected (or vice-versa).
+        - We only update the existing label's properties instead of
+          destroying/recreating it, so settings changes don't break the widget.
+        """
         if self._label is None:
             return
 
@@ -33,22 +47,24 @@ class TextWidget(BaseDashboardWidget):
         size     = int(self._settings.get('font_size', 14))
         bold     = self._settings.get('bold', False)
         italic   = self._settings.get('italic', False)
-        align    = self._settings.get('align', 'left')
+        # BUG 7 FIX: align is always stored/read as a plain string key
+        align_key = self._settings.get('align', 'left')
+        # Normalise: accept Qt int flags stored as int by older versions
+        if not isinstance(align_key, str):
+            align_key = 'left'
         color    = self._settings.get('color', '#e8edf2')   # светлый по умолчанию
         bg_color = self._settings.get('bg_color', 'transparent')
 
         weight = 'bold'   if bold   else 'normal'
         style  = 'italic' if italic else 'normal'
 
-        # Выравнивание Qt
-        qt_align = {
-            'left':   Qt.AlignLeft | Qt.AlignTop,
-            'center': Qt.AlignCenter,
-            'right':  Qt.AlignRight | Qt.AlignTop,
-        }.get(align, Qt.AlignLeft | Qt.AlignTop)
+        # BUG 7 FIX: look up Qt alignment flag from string; default to AlignLeft
+        qt_align = _ALIGN_MAP.get(align_key, Qt.AlignLeft | Qt.AlignTop)
         self._label.setAlignment(qt_align)
 
-        css_bg = f'background:{bg_color};' if bg_color and bg_color != 'transparent' else 'background:transparent;'
+        css_bg = (f'background:{bg_color};'
+                  if bg_color and bg_color != 'transparent'
+                  else 'background:transparent;')
         self._label.setStyleSheet(
             f"font-size:{size}px; font-weight:{weight}; font-style:{style};"
             f" color:{color}; {css_bg} padding:4px;"
@@ -56,4 +72,5 @@ class TextWidget(BaseDashboardWidget):
         self._label.setText(content or '<span style="opacity:0.4">Текст…</span>')
 
     def refresh(self):
+        # BUG 7 FIX: refresh just re-applies settings without touching widget tree
         self._apply_settings()

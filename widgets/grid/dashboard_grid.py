@@ -183,12 +183,13 @@ class DashboardGrid(QWidget):
 
     def serialize(self) -> dict:
         widgets = []
+        counter = 0
         for (row, col), widget in self._cell_widgets.items():
             cell = self.cell_at(row, col)
             if cell and hasattr(widget, 'serialize'):
-                self._widget_counter += 1
+                counter += 1
                 widgets.append({
-                    'id':       f"widget_{self._widget_counter}",
+                    'id':       f"widget_{counter}",
                     'type':     cell.widget_type,
                     'row':      row,
                     'col':      col,

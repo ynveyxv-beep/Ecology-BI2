@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap, QPainter
+from PySide6.QtGui import QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFileDialog, QMessageBox, QStackedWidget,
@@ -28,8 +28,6 @@ from exporters.html_exporter import export_to_html
 from exporters.report_exporter import export_report
 from widgets.dialogs.report_dialog import ReportDialog
 from ui.dataset_manager import DatasetManager
-from ui.ai_panel import AIPanelWidget
-from ui.ml_panel import MLPanel
 import ui.theme as _tm
 from ui.theme import (
     BG_DEEP, BG_DARK, BG_PANEL, BG_CARD, BG_HOVER, BG_ACTIVE,
@@ -226,13 +224,16 @@ class DashboardSummary(QFrame):
     add_widget_clicked = Signal()
 
     _TYPE_NAMES = {
-        'chart':  '📈 График',
-        'kpi':    '🔢 KPI',
-        'table':  '📋 Таблица',
-        'map':    '🗺 Карта',
-        'text':   '📝 Текст',
-        'image':  '🖼 Изображ.',
-        'filter': '🔍 Фильтр',
+        'chart':    '📈 График',
+        'kpi':      '🔢 KPI',
+        'table':    '📋 Таблица',
+        'map':      '🗺 Карта',
+        'text':     '📝 Текст',
+        'image':    '🖼 Изображ.',
+        'filter':   '🔍 Фильтр',
+        'gauge':    '⊙ Датчик',
+        'progress': '≡ Прогресс',
+        'pivot':    '⊞ Сводная',
     }
 
     def __init__(self, parent=None):
@@ -405,19 +406,23 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
 
     def __init__(self):
         super().__init__()
-        self.log.info("🚀 Инициализация ConfiguratorWindow")
+        self.log.info("Инициализация ConfiguratorWindow")
 
         self._datasets: dict        = {}
         self._pages: list           = []   # list[DashboardGrid]
         self._current_save_path: str | None = None   # путь к текущему файлу
         self._has_unsaved_changes: bool = False
         self._toolbar_btns: list    = []   # list of (QPushButton, is_accent)
-        self._ml_panel: "MLPanel | None" = None
 
         self._init_ui()
         self._add_page("Страница 1")
 
-        self.log.info("✅ ConfiguratorWindow инициализирован")
+        # BUG 3 FIX: apply the current theme when the window is first created,
+        # so that opening the configurator after returning from the main menu
+        # always uses the correct theme colours.
+        self._refresh_theme_styles()
+
+        self.log.info("ConfiguratorWindow инициализирован")
 
     # ─── Сборка UI ───────────────────────────────────────────────────────────
 
@@ -464,12 +469,6 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         right_v.addWidget(self._stack, 1)
 
         body_h.addWidget(right, 1)
-
-        # AI-панель (сворачиваемая, справа)
-        self._ai_panel = AIPanelWidget()
-        self._ai_panel.action_requested.connect(self._on_ai_action)
-        body_h.addWidget(self._ai_panel)
-
         root.addWidget(body, 1)
 
     def _build_toolbar(self) -> QWidget:
@@ -491,9 +490,6 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         self._make_btn(lay, "🌐 HTML", self.export_html)
         self._make_btn(lay, "📋 Отчёт", self.export_report_action)
         self._make_btn(lay, "📷 Экспорт PNG", self.export_png)
-        self._sep(lay)
-        self._make_btn(lay, "🤖 AI", self._toggle_ai)
-        self._make_btn(lay, "📈 ML", self._open_ml_panel)
 
         lay.addStretch()
 
@@ -518,8 +514,10 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         )
         for tid, tname in THEME_LIST:
             self._theme_combo.addItem(tname, tid)
+        # BUG 3 FIX: initialise combo to the *current* active theme, not just index 0.
+        # This ensures the combo reflects the actual theme after navigating back.
         cur_idx = next((i for i, (tid, _) in enumerate(THEME_LIST)
-                        if tid == CURRENT_THEME_NAME), 0)
+                        if tid == _tm.CURRENT_THEME_NAME), 0)
         self._theme_combo.setCurrentIndex(cur_idx)
         self._theme_combo.currentIndexChanged.connect(self._on_theme_changed)
         lay.addWidget(self._theme_combo)
@@ -578,7 +576,20 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
             self._refresh_theme_styles()
 
     def _refresh_theme_styles(self):
-        """Перегенерирует inline-стили всех key-виджетов тулбара и окна."""
+        """
+        BUG 3 FIX: Перегенерирует inline-стили всех key-виджетов тулбара и окна.
+        Now also syncs the theme combo-box to the *current* active theme so that
+        returning from the main menu and re-opening the configurator shows the
+        correct theme rather than reverting to the default appearance.
+        """
+        # Sync combo to current theme (in case theme changed externally or we just created the window)
+        cur_idx = next((i for i in range(self._theme_combo.count())
+                        if self._theme_combo.itemData(i) == _tm.CURRENT_THEME_NAME), -1)
+        if cur_idx >= 0 and self._theme_combo.currentIndex() != cur_idx:
+            self._theme_combo.blockSignals(True)
+            self._theme_combo.setCurrentIndex(cur_idx)
+            self._theme_combo.blockSignals(False)
+
         # Toolbar bar background
         self._toolbar_bar.setStyleSheet(
             f"background:{_tm.BG_PANEL}; border-bottom:1px solid {_tm.BORDER};"
@@ -629,70 +640,6 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         # Dashboard grids (canvas, splitters, cells)
         for grid in self._pages:
             grid.refresh_theme()
-        # AI panel
-        if hasattr(self, '_ai_panel'):
-            self._ai_panel.refresh_theme()
-
-    # ─── AI-ассистент ────────────────────────────────────────────────────────────
-
-    def _toggle_ai(self):
-        """Показать / скрыть боковую AI-панель."""
-        self._ai_panel.toggle()
-
-    # ─── ML-анализ ───────────────────────────────────────────────────────────────
-
-    def _open_ml_panel(self):
-        """Открывает диалог ML-анализа (немодальный)."""
-        if not hasattr(self, '_ml_panel') or self._ml_panel is None:
-            self._ml_panel = MLPanel(self._datasets, parent=self)
-        else:
-            # Обновляем датасеты если окно уже было открыто
-            self._ml_panel.set_datasets(self._datasets)
-        self._ml_panel.show()
-        self._ml_panel.raise_()
-        self._ml_panel.activateWindow()
-
-    def _on_ai_action(self, action: dict):
-        """
-        Обрабатывает команду от AI: создаёт виджет на текущей странице.
-        action = {"action":"create_widget","type":"chart","config":{...}}
-        """
-        grid = self._current_grid()
-        if not grid:
-            return
-
-        widget_type = action.get("type", "chart")
-        config      = action.get("config", {})
-
-        # Ищем первую пустую ячейку слева направо, сверху вниз
-        for row in range(grid.rows):
-            for col in range(grid.cols):
-                if grid.is_empty_at(row, col):
-                    try:
-                        widget = DashboardWidgetFactory.create(widget_type, config)
-                        if widget is None:
-                            raise ValueError(f"Фабрика вернула None для типа '{widget_type}'")
-                        if self._datasets and hasattr(widget, 'set_datasets'):
-                            widget.set_datasets(self._datasets)
-                        grid.add_widget(widget, widget_type, row, col)
-                        self.log.info(f"🤖 AI создал виджет '{widget_type}' в [{row},{col}]")
-                    except Exception as exc:
-                        self.log.error(f"❌ AI widget error: {exc}")
-                        QMessageBox.warning(
-                            self, "AI: ошибка",
-                            f"Не удалось создать виджет «{widget_type}»:\n{exc}"
-                        )
-                    return
-
-        # Свободных ячеек нет — предложить расширить сетку
-        reply = QMessageBox.question(
-            self, "AI: нет места",
-            "Все ячейки заняты. Добавить новую строку для виджета?",
-            QMessageBox.Yes | QMessageBox.No,
-        )
-        if reply == QMessageBox.Yes:
-            grid.add_row()
-            self._on_ai_action(action)   # повтор после расширения
 
     # ─── Страницы ─────────────────────────────────────────────────────────────
 
@@ -743,7 +690,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
     # ─── Виджеты ─────────────────────────────────────────────────────────────
 
     def _on_widget_added(self, row, col, widget_type, settings):
-        self.log.info(f"✅ Виджет ({row},{col}): {widget_type}")
+        self.log.info(f"Виджет ({row},{col}): {widget_type}")
         self._has_unsaved_changes = True
         self.save_btn.setEnabled(True)
         self._update_current_name()
@@ -751,7 +698,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         self._refresh_summary()
 
     def _on_widget_removed(self, row, col):
-        self.log.info(f"❌ Удалён ({row},{col})")
+        self.log.info(f"Удалён ({row},{col})")
         self._has_unsaved_changes = True
         self._update_current_name()
         self._update_info()
@@ -843,8 +790,9 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                 widget.set_datasets(self._datasets)
             grid.add_widget(widget, widget_type, row, col)
         except Exception as e:
-            self.log.error(f"❌ {e}")
-            QMessageBox.critical(self, "Ошибка", str(e))
+            self.log.error(f"Ошибка создания виджета: {e}")
+            # BUG 8 FIX: show error in a visible, properly styled message box
+            QMessageBox.critical(self, "Ошибка создания виджета", str(e))
 
     def _edit_widget(self, row, col, widget, widget_type):
         dlg = WidgetCreationDialog(self, preset_type=widget_type, datasets=self._datasets)
@@ -868,7 +816,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                 widget.set_datasets(self._datasets)
             grid.add_widget(widget, widget_type, row, col)
         except Exception as e:
-            self.log.error(f"❌ {e}")
+            self.log.error(f"Ошибка обновления виджета: {e}")
             QMessageBox.critical(self, "Ошибка", str(e))
 
     # ─── Загрузка данных ─────────────────────────────────────────────────────
@@ -901,14 +849,14 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                 counter += 1
             self._datasets[name] = df
             self._on_datasets_changed(self._datasets)
-            self.log.info(f"📂 Загружены данные: {name} ({len(df)} строк, {len(df.columns)} столбцов)")
+            self.log.info(f"Загружены данные: {name} ({len(df)} строк, {len(df.columns)} столбцов)")
             QMessageBox.information(
                 self, "Данные загружены",
                 f"Файл «{os.path.basename(path)}» загружен как датасет «{name}».\n"
                 f"Строк: {len(df)}, столбцов: {len(df.columns)}"
             )
         except Exception as e:
-            self.log.error(f"❌ Ошибка загрузки данных: {e}")
+            self.log.error(f"Ошибка загрузки данных: {e}")
             QMessageBox.critical(self, "Ошибка загрузки", str(e))
 
     # ─── Экспорт в PNG ────────────────────────────────────────────────────────
@@ -945,7 +893,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
             # Возвращаем активную страницу
             self._tab_bar._select(current_idx)
 
-            self.log.info(f"📷 PNG экспортировано: {len(saved)} страниц → {tdir}")
+            self.log.info(f"PNG экспортировано: {len(saved)} страниц → {tdir}")
             QMessageBox.information(
                 self, "Экспорт завершён",
                 f"Сохранено {len(saved)} PNG-файл{'а' if len(saved) in (2,3,4) else 'ов' if len(saved)!=1 else ''}:\n"
@@ -953,14 +901,13 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                 f"\n\nПапка: {tdir}"
             )
         except Exception as e:
-            self.log.error(f"❌ Ошибка экспорта PNG: {e}")
+            self.log.error(f"Ошибка экспорта PNG: {e}")
             QMessageBox.critical(self, "Ошибка экспорта", str(e))
 
     # ─── Датасеты ─────────────────────────────────────────────────────────────
 
     def _open_dataset_manager(self):
         dlg = DatasetManager(self._datasets, self)
-        dlg.datasets_changed.connect(self._on_datasets_changed)
         dlg.exec()
         self._on_datasets_changed(dlg.get_datasets())
 
@@ -968,10 +915,6 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         self._datasets = datasets
         for grid in self._pages:
             grid.set_datasets(datasets)
-        if hasattr(self, '_ai_panel'):
-            self._ai_panel.set_datasets(datasets)
-        if hasattr(self, '_ml_panel') and self._ml_panel is not None:
-            self._ml_panel.set_datasets(datasets)
         self._update_info()
         self._refresh_summary()
 
@@ -1013,6 +956,11 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         self._save_to_path(path)
 
     def _save_to_path(self, path: str, silent: bool = False):
+        """
+        BUG 8 FIX: Wrapped entire save in try/except with a visible error dialog.
+        Previously errors could be swallowed silently.  Now they always surface
+        as a QMessageBox.critical() so the user knows the save failed.
+        """
         try:
             pages_data = []
             for i, grid in enumerate(self._pages):
@@ -1064,13 +1012,17 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
             except Exception:
                 pass  # не критично
 
-            self.log.info(f"💾 Дашборд сохранён: {path}")
+            self.log.info(f"Дашборд сохранён: {path}")
             if not silent:
                 QMessageBox.information(self, "Сохранено", f"Дашборд сохранён:\n{path}")
         except Exception as e:
-            self.log.error(f"❌ Ошибка сохранения: {e}")
+            self.log.error(f"Ошибка сохранения: {e}")
             if not silent:
-                QMessageBox.critical(self, "Ошибка", str(e))
+                # BUG 8 FIX: always show the error — never silently discard it
+                QMessageBox.critical(
+                    self, "Ошибка сохранения",
+                    f"Не удалось сохранить дашборд:\n{path}\n\nПричина: {e}"
+                )
             raise
 
     def export_html(self):
@@ -1090,7 +1042,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
             QMessageBox.warning(self, "Экспорт HTML", "Нет виджетов для экспорта.")
             return
 
-        dashboard_name = getattr(self, '_last_save_path', None)
+        dashboard_name = getattr(self, '_current_save_path', None)
         default_name   = (
             os.path.splitext(os.path.basename(dashboard_name))[0]
             if dashboard_name else 'dashboard'
@@ -1110,13 +1062,13 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         }
         try:
             export_to_html(data, path, open_browser=True)
-            self.log.info(f"🌐 HTML экспортирован: {path}")
+            self.log.info(f"HTML экспортирован: {path}")
             QMessageBox.information(
                 self, "Готово",
                 f"HTML сохранён:\n{path}\n\nОткрывается в браузере."
             )
         except Exception as e:
-            self.log.error(f"❌ Ошибка экспорта HTML: {e}")
+            self.log.error(f"Ошибка экспорта HTML: {e}")
             QMessageBox.critical(self, "Ошибка", str(e))
 
     def export_report_action(self):
@@ -1152,14 +1104,14 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         }
         try:
             export_report(data, path, open_browser=True, **params)
-            self.log.info(f"📋 Отчёт сформирован: {path}")
+            self.log.info(f"Отчёт сформирован: {path}")
             QMessageBox.information(
                 self, "Готово",
                 f"Отчёт сохранён:\n{path}\n\nОткрывается в браузере.\n"
                 "Для PDF нажмите «Печать / PDF» на странице."
             )
         except Exception as e:
-            self.log.error(f"❌ Ошибка генерации отчёта: {e}")
+            self.log.error(f"Ошибка генерации отчёта: {e}")
             QMessageBox.critical(self, "Ошибка", str(e))
 
     def load_dashboard(self):
@@ -1211,6 +1163,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                 while grid.cols < pd_.get('columns', 3):
                     grid.add_column()
 
+                error_count = 0
                 for wd in pd_.get('widgets', []):
                     row, col = wd.get('row', 0), wd.get('col', 0)
                     wtype = wd.get('type', '')
@@ -1226,7 +1179,8 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                             grid.add_widget(widget, wtype, row, col,
                                             wd.get('row_span', 1), wd.get('col_span', 1))
                         except Exception as e:
-                            self.log.error(f"❌ {wtype}: {e}")
+                            self.log.error(f"Ошибка загрузки виджета {wtype}: {e}")
+                            error_count += 1
 
             if self._tab_bar.count() > 0:
                 self._tab_bar._select(0)
@@ -1251,11 +1205,15 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
                     self._theme_combo.setCurrentIndex(idx)
                     self._theme_combo.blockSignals(False)
 
-            QMessageBox.information(self, "Загружено",
-                f"«{data.get('name','Без названия')}» — страниц: {len(pages)}")
+            msg = f"«{data.get('name','Без названия')}» — страниц: {len(pages)}"
+            if error_count:
+                msg += f"\n⚠ Не удалось загрузить виджетов: {error_count}"
+            QMessageBox.information(self, "Загружено", msg)
 
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", str(e))
+            # BUG 8 FIX: always show load errors in a visible dialog
+            self.log.error(f"Ошибка загрузки дашборда: {e}")
+            QMessageBox.critical(self, "Ошибка загрузки", str(e))
 
     # ─── Автосохранение и переключение ────────────────────────────────────────
 
@@ -1269,10 +1227,10 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         if self._current_save_path:
             try:
                 self._save_to_path(self._current_save_path, silent=True)
-                self.log.info(f"💾 Автосохранение: {self._current_save_path}")
+                self.log.info(f"Автосохранение: {self._current_save_path}")
                 return True
             except Exception as e:
-                self.log.error(f"❌ Автосохранение не удалось: {e}")
+                self.log.error(f"Автосохранение не удалось: {e}")
                 return False
         # Путь неизвестен — спросить
         reply = QMessageBox.question(
@@ -1293,14 +1251,14 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
             marker = '●' if self._has_unsaved_changes else '◉'
             self._current_name_lbl.setText(f"{marker} {base}")
             self._current_name_lbl.setStyleSheet(
-                f"color:{'#fbbf24' if self._has_unsaved_changes else ACCENT};"
+                f"color:{'#fbbf24' if self._has_unsaved_changes else _tm.ACCENT};"
                 f" font-size:11px; padding-right:8px;"
             )
         else:
             marker = '●' if self._has_unsaved_changes else '○'
             self._current_name_lbl.setText(f"{marker} Новый дашборд")
             self._current_name_lbl.setStyleSheet(
-                f"color:{TEXT_MUT}; font-size:11px; padding-right:8px;"
+                f"color:{_tm.TEXT_MUT}; font-size:11px; padding-right:8px;"
             )
 
     def _open_switcher(self):
@@ -1334,24 +1292,24 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         dlg.setWindowTitle("Открыть дашборд")
         dlg.setMinimumWidth(480)
         dlg.setStyleSheet(
-            f"QDialog{{background:{BG_DARK};color:{TEXT_PRI};}}"
-            f"QLabel{{color:{TEXT_SEC};background:transparent;}}"
+            f"QDialog{{background:{_tm.BG_DARK};color:{_tm.TEXT_PRI};}}"
+            f"QLabel{{color:{_tm.TEXT_SEC};background:transparent;}}"
         )
         lay = QVBoxLayout(dlg)
         lay.setContentsMargins(16, 16, 16, 16)
         lay.setSpacing(10)
 
         lbl = QLabel("Выберите дашборд:")
-        lbl.setStyleSheet(f"font-size:12px;font-weight:600;color:{TEXT_PRI};")
+        lbl.setStyleSheet(f"font-size:12px;font-weight:600;color:{_tm.TEXT_PRI};")
         lay.addWidget(lbl)
 
         lst = QListWidget()
         lst.setStyleSheet(
-            f"QListWidget{{background:{BG_CARD};border:1px solid {BORDER};"
-            f"border-radius:5px;color:{TEXT_PRI};font-size:12px;outline:none;}}"
-            f"QListWidget::item{{padding:8px 10px;border-bottom:1px solid {BG_PANEL};}}"
-            f"QListWidget::item:selected{{background:{BG_ACTIVE};color:{ACCENT};}}"
-            f"QListWidget::item:hover{{background:{BG_HOVER};}}"
+            f"QListWidget{{background:{_tm.BG_CARD};border:1px solid {_tm.BORDER};"
+            f"border-radius:5px;color:{_tm.TEXT_PRI};font-size:12px;outline:none;}}"
+            f"QListWidget::item{{padding:8px 10px;border-bottom:1px solid {_tm.BG_PANEL};}}"
+            f"QListWidget::item:selected{{background:{_tm.BG_ACTIVE};color:{_tm.ACCENT};}}"
+            f"QListWidget::item:hover{{background:{_tm.BG_HOVER};}}"
         )
         for path in files:
             try:
@@ -1367,7 +1325,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
             item.setData(Qt.UserRole, path)
             # Отметим текущий
             if os.path.abspath(path) == (self._current_save_path and os.path.abspath(self._current_save_path)):
-                item.setForeground(ACCENT)
+                item.setForeground(QColor(_tm.ACCENT))
                 item.setText("▶ " + label)
             lst.addItem(item)
 
@@ -1376,7 +1334,7 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
 
         hint = QLabel("Двойной клик или «Открыть» — переключить. Текущий будет сохранён автоматически.")
         hint.setWordWrap(True)
-        hint.setStyleSheet(f"font-size:10px;color:{TEXT_MUT};")
+        hint.setStyleSheet(f"font-size:10px;color:{_tm.TEXT_MUT};")
         lay.addWidget(hint)
 
         btns = QDialogButtonBox()
@@ -1386,9 +1344,9 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
         btns.rejected.connect(dlg.reject)
         btns.accepted.connect(dlg.accept)
         open_btn.setStyleSheet(
-            f"QPushButton{{background:{ACCENT_DARK};color:{TEXT_PRI};border:none;"
+            f"QPushButton{{background:{_tm.ACCENT_DARK};color:{_tm.TEXT_PRI};border:none;"
             f"border-radius:5px;padding:6px 16px;font-weight:bold;}}"
-            f"QPushButton:hover{{background:{ACCENT};}}"
+            f"QPushButton:hover{{background:{_tm.ACCENT};}}"
         )
 
         def _do_new():
@@ -1396,9 +1354,9 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
 
         new_btn.clicked.connect(_do_new)
         new_btn.setStyleSheet(
-            f"QPushButton{{background:{BG_CARD};border:1px solid {BORDER};"
-            f"border-radius:5px;padding:6px 14px;color:{TEXT_SEC};}}"
-            f"QPushButton:hover{{border-color:{BORDER_LT};color:{TEXT_PRI};}}"
+            f"QPushButton{{background:{_tm.BG_CARD};border:1px solid {_tm.BORDER};"
+            f"border-radius:5px;padding:6px 14px;color:{_tm.TEXT_SEC};}}"
+            f"QPushButton:hover{{border-color:{_tm.BORDER_LT};color:{_tm.TEXT_PRI};}}"
         )
         lay.addWidget(btns)
 
@@ -1444,6 +1402,15 @@ class ConfiguratorWindow(QWidget, LoggerMixin):
     # ─── Навигация ────────────────────────────────────────────────────────────
 
     def go_back(self):
-        self.log.info("⬅️ Назад")
+        self.log.info("Назад")
         self.auto_save()   # тихо сохраняем если есть путь
         self.back_clicked.emit()
+
+    def showEvent(self, event):
+        """
+        BUG 3 FIX: Re-apply the current theme every time the window becomes visible.
+        This handles the case where the user navigated to the main menu (which may
+        have reset theme state) and then returned to the configurator.
+        """
+        super().showEvent(event)
+        self._refresh_theme_styles()

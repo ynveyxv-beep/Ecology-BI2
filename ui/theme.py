@@ -1,274 +1,257 @@
 # ui/theme.py
 """
-Тема Ecology-BI — поддержка 6 встроенных тем.
+Тема Ecology-BI — «Slate Dark» (Vercel / Linear style).
 Импортируй константы отсюда, не дублируй по файлам.
 """
 
-# ─── Таблица тем ──────────────────────────────────────────────────────────────
+# ─── Фон ──────────────────────────────────────────────────────────────────────
+BG_DEEP     = "#060B18"   # глубочайший фон — корень приложения
+BG_DARK     = "#0F172A"   # основной фон (slate-900)
+BG_PANEL    = "#1E293B"   # панели, тулбар (slate-800)
+BG_CARD     = "#263347"   # карточки, ячейки (slate-750)
+BG_HOVER    = "#2D3E56"   # hover-состояние
+BG_ACTIVE   = "#1D3A5C"   # активный / выбранный элемент
 
-THEMES = {
-    'ocean': {
-        'name':         '🌊 Ocean',
-        'BG_DEEP':      '#060B18',
-        'BG_DARK':      '#0F172A',
-        'BG_PANEL':     '#1E293B',
-        'BG_CARD':      '#263347',
-        'BG_HOVER':     '#2D3E56',
-        'BG_ACTIVE':    '#1D3A5C',
-        'BORDER':       '#334155',
-        'BORDER_LT':    '#475569',
-        'BORDER_ACC':   '#38BDF8',
-        'TEXT_PRI':     '#F1F5F9',
-        'TEXT_SEC':     '#94A3B8',
-        'TEXT_MUT':     '#64748B',
-        'ACCENT':       '#38BDF8',
-        'ACCENT_DARK':  '#0284C7',
-        'ACCENT_GLOW':  '#7DD3FC',
-        'ACCENT_RED':   '#F87171',
-        'ACCENT_GOLD':  '#FBBF24',
-        'CHART_PALETTE': ['#38BDF8','#818CF8','#FBBF24','#F87171',
-                          '#34D399','#A78BFA','#F472B6','#4ADE80'],
-    },
-    'emerald': {
-        'name':         '🌿 Emerald',
-        'BG_DEEP':      '#030d07',
-        'BG_DARK':      '#081a0f',
-        'BG_PANEL':     '#0e2718',
-        'BG_CARD':      '#153320',
-        'BG_HOVER':     '#1c4229',
-        'BG_ACTIVE':    '#1a3d26',
-        'BORDER':       '#1e5733',
-        'BORDER_LT':    '#2d7a47',
-        'BORDER_ACC':   '#4ade80',
-        'TEXT_PRI':     '#f0fdf4',
-        'TEXT_SEC':     '#86efac',
-        'TEXT_MUT':     '#4d9966',
-        'ACCENT':       '#4ade80',
-        'ACCENT_DARK':  '#16a34a',
-        'ACCENT_GLOW':  '#bbf7d0',
-        'ACCENT_RED':   '#f87171',
-        'ACCENT_GOLD':  '#fbbf24',
-        'CHART_PALETTE': ['#4ade80','#34d399','#86efac','#fbbf24',
-                          '#38bdf8','#a78bfa','#f472b6','#f87171'],
-    },
-    'midnight': {
-        'name':         '🌌 Midnight',
-        'BG_DEEP':      '#05030f',
-        'BG_DARK':      '#0c0a1e',
-        'BG_PANEL':     '#1a1730',
-        'BG_CARD':      '#231f3e',
-        'BG_HOVER':     '#2d2855',
-        'BG_ACTIVE':    '#2a2460',
-        'BORDER':       '#3b3565',
-        'BORDER_LT':    '#524c8a',
-        'BORDER_ACC':   '#a78bfa',
-        'TEXT_PRI':     '#f5f3ff',
-        'TEXT_SEC':     '#c4b5fd',
-        'TEXT_MUT':     '#7c6fcd',
-        'ACCENT':       '#a78bfa',
-        'ACCENT_DARK':  '#7c3aed',
-        'ACCENT_GLOW':  '#ddd6fe',
-        'ACCENT_RED':   '#f87171',
-        'ACCENT_GOLD':  '#fbbf24',
-        'CHART_PALETTE': ['#a78bfa','#818cf8','#c4b5fd','#f472b6',
-                          '#38bdf8','#34d399','#fbbf24','#f87171'],
-    },
-    'sunset': {
-        'name':         '🌅 Sunset',
-        'BG_DEEP':      '#0f0400',
-        'BG_DARK':      '#1a0800',
-        'BG_PANEL':     '#2a1200',
-        'BG_CARD':      '#391a00',
-        'BG_HOVER':     '#4a2200',
-        'BG_ACTIVE':    '#5a2900',
-        'BORDER':       '#7c3a00',
-        'BORDER_LT':    '#a35000',
-        'BORDER_ACC':   '#fb923c',
-        'TEXT_PRI':     '#fff7ed',
-        'TEXT_SEC':     '#fed7aa',
-        'TEXT_MUT':     '#c2670f',
-        'ACCENT':       '#fb923c',
-        'ACCENT_DARK':  '#ea580c',
-        'ACCENT_GLOW':  '#fdba74',
-        'ACCENT_RED':   '#f87171',
-        'ACCENT_GOLD':  '#fbbf24',
-        'CHART_PALETTE': ['#fb923c','#fbbf24','#f87171','#a78bfa',
-                          '#34d399','#38bdf8','#f472b6','#86efac'],
-    },
-    'arctic': {
-        'name':         '❄️ Arctic',
-        'BG_DEEP':      '#dde8f5',
-        'BG_DARK':      '#edf3fb',
-        'BG_PANEL':     '#dce8f5',
-        'BG_CARD':      '#ffffff',
-        'BG_HOVER':     '#d0e4f5',
-        'BG_ACTIVE':    '#bdd5ef',
-        'BORDER':       '#b8cfe8',
-        'BORDER_LT':    '#90b5d8',
-        'BORDER_ACC':   '#0284c7',
-        'TEXT_PRI':     '#0f172a',
-        'TEXT_SEC':     '#1e3a5f',
-        'TEXT_MUT':     '#475569',
-        'ACCENT':       '#0284c7',
-        'ACCENT_DARK':  '#0369a1',
-        'ACCENT_GLOW':  '#38bdf8',
-        'ACCENT_RED':   '#dc2626',
-        'ACCENT_GOLD':  '#d97706',
-        'CHART_PALETTE': ['#0284c7','#7c3aed','#059669','#d97706',
-                          '#dc2626','#0891b2','#9333ea','#16a34a'],
-    },
-    'slate': {
-        'name':         '🔷 Slate',
-        'BG_DEEP':      '#0a0e1a',
-        'BG_DARK':      '#111827',
-        'BG_PANEL':     '#1f2937',
-        'BG_CARD':      '#283444',
-        'BG_HOVER':     '#374151',
-        'BG_ACTIVE':    '#1e3a5f',
-        'BORDER':       '#374151',
-        'BORDER_LT':    '#4b5563',
-        'BORDER_ACC':   '#60a5fa',
-        'TEXT_PRI':     '#f9fafb',
-        'TEXT_SEC':     '#9ca3af',
-        'TEXT_MUT':     '#6b7280',
-        'ACCENT':       '#60a5fa',
-        'ACCENT_DARK':  '#2563eb',
-        'ACCENT_GLOW':  '#93c5fd',
-        'ACCENT_RED':   '#f87171',
-        'ACCENT_GOLD':  '#fbbf24',
-        'CHART_PALETTE': ['#60a5fa','#34d399','#fbbf24','#f87171',
-                          '#a78bfa','#38bdf8','#f472b6','#86efac'],
-    },
-}
+# ─── Границы ──────────────────────────────────────────────────────────────────
+BORDER      = "#334155"   # спокойная граница (slate-700)
+BORDER_LT   = "#475569"   # немного ярче (slate-600)
+BORDER_ACC  = "#38BDF8"   # акцентная граница — cyan-400
 
-# Список тем для выпадающего меню — (id, отображаемое имя)
-THEME_LIST = [(k, v['name']) for k, v in THEMES.items()]
+# ─── Текст ────────────────────────────────────────────────────────────────────
+TEXT_PRI    = "#F1F5F9"   # основной текст (slate-100)
+TEXT_SEC    = "#94A3B8"   # вторичный (slate-400)
+TEXT_MUT    = "#64748B"   # приглушённый (slate-500)
 
-# Текущая активная тема
-CURRENT_THEME_NAME: str = 'ocean'
+# ─── Акценты ──────────────────────────────────────────────────────────────────
+ACCENT      = "#38BDF8"   # cyan-400 — основной акцент
+ACCENT_DARK = "#0284C7"   # cyan-600 — кнопки, бэкграунд акцента
+ACCENT_GLOW = "#7DD3FC"   # cyan-300 — hover-подсветка
+ACCENT_RED  = "#F87171"   # red-400 — предупреждение / удаление
+ACCENT_GOLD = "#FBBF24"   # amber-400 — второстепенный акцент
 
-# ─── Активные константы (по умолчанию — Ocean) ────────────────────────────────
+# ─── Волга (бирюзово-синие тона для карты) ────────────────────────────────────
+VOLGA_DARK  = "#164E63"   # cyan-950
+VOLGA_MID   = "#0E7490"   # cyan-700
+VOLGA_LIGHT = "#22D3EE"   # cyan-400
 
-BG_DEEP     = '#060B18'
-BG_DARK     = '#0F172A'
-BG_PANEL    = '#1E293B'
-BG_CARD     = '#263347'
-BG_HOVER    = '#2D3E56'
-BG_ACTIVE   = '#1D3A5C'
-
-BORDER      = '#334155'
-BORDER_LT   = '#475569'
-BORDER_ACC  = '#38BDF8'
-
-TEXT_PRI    = '#F1F5F9'
-TEXT_SEC    = '#94A3B8'
-TEXT_MUT    = '#64748B'
-
-ACCENT      = '#38BDF8'
-ACCENT_DARK = '#0284C7'
-ACCENT_GLOW = '#7DD3FC'
-ACCENT_RED  = '#F87171'
-ACCENT_GOLD = '#FBBF24'
-
-# ─── Eco-специфичные (Volga) ──────────────────────────────────────────────────
-VOLGA_DARK  = '#164E63'
-VOLGA_MID   = '#0E7490'
-VOLGA_LIGHT = '#22D3EE'
-
-# ─── Скругления (не зависят от темы) ─────────────────────────────────────────
-RADIUS    = '6px'
-RADIUS_SM = '4px'
-RADIUS_LG = '10px'
+# ─── Скругления ───────────────────────────────────────────────────────────────
+RADIUS      = "6px"       # стандартное скругление
+RADIUS_SM   = "4px"       # маленькое — кнопки, теги
+RADIUS_LG   = "10px"      # большое — карточки, диалоги
 
 # ─── Палитра графиков ─────────────────────────────────────────────────────────
 CHART_PALETTE = [
-    '#38BDF8', '#818CF8', '#FBBF24', '#F87171',
-    '#34D399', '#A78BFA', '#F472B6', '#4ADE80',
+    "#38BDF8",   # cyan    — основной
+    "#818CF8",   # indigo  — второй
+    "#FBBF24",   # amber   — третий
+    "#F87171",   # red     — четвёртый
+    "#34D399",   # emerald — пятый
+    "#A78BFA",   # violet  — шестой
+    "#F472B6",   # pink    — седьмой
+    "#4ADE80",   # green   — восьмой
 ]
 
+# ─── Список доступных тем ─────────────────────────────────────────────────────
+THEME_LIST = [
+    ('slate_dark',  'Тёмный Slate'),
+    ('forest_dark', 'Тёмный Лес'),
+    ('ocean_dark',  'Тёмный Океан'),
+    ('light',       'Светлый'),
+]
 
-# ─── Колбэки смены темы ───────────────────────────────────────────────────────
+CURRENT_THEME_NAME = 'slate_dark'
 
+# ─── Реестр коллбэков при смене темы ─────────────────────────────────────────
 _theme_callbacks: list = []
 
 
-def register_theme_callback(cb) -> None:
-    """Регистрирует функцию, которая вызывается при каждой смене темы."""
-    if cb not in _theme_callbacks:
-        _theme_callbacks.append(cb)
+def register_theme_callback(fn) -> None:
+    """Регистрирует функцию, которая вызывается при смене темы."""
+    if fn not in _theme_callbacks:
+        _theme_callbacks.append(fn)
 
 
-def unregister_theme_callback(cb) -> None:
-    """Снимает регистрацию колбэка (например при закрытии окна)."""
+def unregister_theme_callback(fn) -> None:
+    """Удаляет ранее зарегистрированный коллбэк."""
     try:
-        _theme_callbacks.remove(cb)
+        _theme_callbacks.remove(fn)
     except ValueError:
         pass
 
 
-# ─── Переключение темы ────────────────────────────────────────────────────────
+# ─── Хранилище тем ────────────────────────────────────────────────────────────
+_THEMES = {
+    'slate_dark': {
+        'BG_DEEP':    "#060B18",
+        'BG_DARK':    "#0F172A",
+        'BG_PANEL':   "#1E293B",
+        'BG_CARD':    "#263347",
+        'BG_HOVER':   "#2D3E56",
+        'BG_ACTIVE':  "#1D3A5C",
+        'BORDER':     "#334155",
+        'BORDER_LT':  "#475569",
+        'BORDER_ACC': "#38BDF8",
+        'TEXT_PRI':   "#F1F5F9",
+        'TEXT_SEC':   "#94A3B8",
+        'TEXT_MUT':   "#64748B",
+        'ACCENT':     "#38BDF8",
+        'ACCENT_DARK':"#0284C7",
+        'ACCENT_GLOW':"#7DD3FC",
+        'ACCENT_RED': "#F87171",
+    },
+    'forest_dark': {
+        'BG_DEEP':    "#030A03",
+        'BG_DARK':    "#0A1A0A",
+        'BG_PANEL':   "#152515",
+        'BG_CARD':    "#1C331C",
+        'BG_HOVER':   "#244024",
+        'BG_ACTIVE':  "#1A4A1A",
+        'BORDER':     "#2A4A2A",
+        'BORDER_LT':  "#3A6A3A",
+        'BORDER_ACC': "#4ADE80",
+        'TEXT_PRI':   "#F0FFF0",
+        'TEXT_SEC':   "#86A886",
+        'TEXT_MUT':   "#507050",
+        'ACCENT':     "#4ADE80",
+        'ACCENT_DARK':"#16A34A",
+        'ACCENT_GLOW':"#86EFAC",
+        'ACCENT_RED': "#F87171",
+    },
+    'ocean_dark': {
+        'BG_DEEP':    "#020810",
+        'BG_DARK':    "#0A1020",
+        'BG_PANEL':   "#101828",
+        'BG_CARD':    "#182035",
+        'BG_HOVER':   "#202845",
+        'BG_ACTIVE':  "#162040",
+        'BORDER':     "#243050",
+        'BORDER_LT':  "#344060",
+        'BORDER_ACC': "#60A0F0",
+        'TEXT_PRI':   "#F0F4FF",
+        'TEXT_SEC':   "#8090B8",
+        'TEXT_MUT':   "#506080",
+        'ACCENT':     "#60A0F0",
+        'ACCENT_DARK':"#2060C0",
+        'ACCENT_GLOW':"#90C0FF",
+        'ACCENT_RED': "#F87171",
+    },
+    'light': {
+        'BG_DEEP':    "#E8ECF0",
+        'BG_DARK':    "#F1F5F9",
+        'BG_PANEL':   "#FFFFFF",
+        'BG_CARD':    "#F8FAFC",
+        'BG_HOVER':   "#EEF2F7",
+        'BG_ACTIVE':  "#DBEAFE",
+        'BORDER':     "#CBD5E1",
+        'BORDER_LT':  "#94A3B8",
+        'BORDER_ACC': "#2563EB",
+        'TEXT_PRI':   "#0F172A",
+        'TEXT_SEC':   "#475569",
+        'TEXT_MUT':   "#94A3B8",
+        'ACCENT':     "#2563EB",
+        'ACCENT_DARK':"#1D4ED8",
+        'ACCENT_GLOW':"#3B82F6",
+        'ACCENT_RED': "#DC2626",
+    },
+}
 
-def set_active_theme(name: str) -> None:
+# 'ocean' — устаревший алиас для старых сохранённых проектов
+_THEMES['ocean'] = _THEMES['ocean_dark']
+
+# Публичный алиас — используется в html_exporter и других модулях
+THEMES = _THEMES
+
+
+def set_active_theme(name: str):
     """
-    Устанавливает активную тему и обновляет:
-    - все модульные константы (BG_*, ACCENT, TEXT_* …)
-    - глобальный QSS приложения
-    - все зарегистрированные колбэки (окна, которые хотят знать о смене темы)
+    Применяет тему по имени — обновляет все модульные переменные в этом модуле.
+    Вызывай после смены темы, затем обновляй inline-стили виджетов.
     """
     global CURRENT_THEME_NAME
-    if name not in THEMES:
-        return
+    global BG_DEEP, BG_DARK, BG_PANEL, BG_CARD, BG_HOVER, BG_ACTIVE
+    global BORDER, BORDER_LT, BORDER_ACC
+    global TEXT_PRI, TEXT_SEC, TEXT_MUT
+    global ACCENT, ACCENT_DARK, ACCENT_GLOW, ACCENT_RED
+
+    theme = _THEMES.get(name, _THEMES['slate_dark'])
     CURRENT_THEME_NAME = name
-    t = THEMES[name]
-    g = globals()
-    for key, val in t.items():
-        if key != 'name':          # 'name' — отображаемое имя, не цвет
-            g[key] = val
-    # Refresh Qt app stylesheet
-    try:
-        from PySide6.QtWidgets import QApplication
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet(app_stylesheet())
-    except Exception:
-        pass
-    # Уведомляем все зарегистрированные окна
-    for cb in list(_theme_callbacks):
+
+    BG_DEEP    = theme['BG_DEEP']
+    BG_DARK    = theme['BG_DARK']
+    BG_PANEL   = theme['BG_PANEL']
+    BG_CARD    = theme['BG_CARD']
+    BG_HOVER   = theme['BG_HOVER']
+    BG_ACTIVE  = theme['BG_ACTIVE']
+    BORDER     = theme['BORDER']
+    BORDER_LT  = theme['BORDER_LT']
+    BORDER_ACC = theme['BORDER_ACC']
+    TEXT_PRI   = theme['TEXT_PRI']
+    TEXT_SEC   = theme['TEXT_SEC']
+    TEXT_MUT   = theme['TEXT_MUT']
+    ACCENT     = theme['ACCENT']
+    ACCENT_DARK = theme['ACCENT_DARK']
+    ACCENT_GLOW = theme['ACCENT_GLOW']
+    ACCENT_RED  = theme['ACCENT_RED']
+
+    # Уведомить всех подписчиков о смене темы
+    for _fn in list(_theme_callbacks):
         try:
-            cb()
+            _fn()
         except Exception:
             pass
+
+
+def get_palette() -> dict:
+    """Returns current theme colors as a dict. Useful for widgets that need
+    to pick up theme changes at runtime."""
+    return {
+        'BG_DEEP':    BG_DEEP,
+        'BG_DARK':    BG_DARK,
+        'BG_PANEL':   BG_PANEL,
+        'BG_CARD':    BG_CARD,
+        'BG_HOVER':   BG_HOVER,
+        'BG_ACTIVE':  BG_ACTIVE,
+        'BORDER':     BORDER,
+        'BORDER_LT':  BORDER_LT,
+        'BORDER_ACC': BORDER_ACC,
+        'TEXT_PRI':   TEXT_PRI,
+        'TEXT_SEC':   TEXT_SEC,
+        'TEXT_MUT':   TEXT_MUT,
+        'ACCENT':     ACCENT,
+        'ACCENT_DARK':ACCENT_DARK,
+        'ACCENT_GLOW':ACCENT_GLOW,
+        'ACCENT_RED': ACCENT_RED,
+    }
 
 
 # ─── Готовые stylesheet-блоки ─────────────────────────────────────────────────
 
 def scrollbar_style(track=None, handle=None, hover=None):
-    """Возвращает QSS для скроллбаров. Параметры читаются из текущей темы."""
-    if track  is None: track  = BG_DARK
-    if handle is None: handle = BORDER
-    if hover  is None: hover  = BORDER_LT
+    t = track  if track  is not None else BG_DARK
+    h = handle if handle is not None else BORDER
+    hv= hover  if hover  is not None else BORDER_LT
     return f"""
         QScrollBar:vertical {{
-            background: {track}; width: 6px; margin: 0;
+            background: {t}; width: 6px; margin: 0;
         }}
         QScrollBar::handle:vertical {{
-            background: {handle}; border-radius: 3px; min-height: 24px;
+            background: {h}; border-radius: 3px; min-height: 24px;
         }}
-        QScrollBar::handle:vertical:hover {{ background: {hover}; }}
+        QScrollBar::handle:vertical:hover {{ background: {hv}; }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
         QScrollBar:horizontal {{
-            background: {track}; height: 6px; margin: 0;
+            background: {t}; height: 6px; margin: 0;
         }}
         QScrollBar::handle:horizontal {{
-            background: {handle}; border-radius: 3px; min-width: 24px;
+            background: {h}; border-radius: 3px; min-width: 24px;
         }}
-        QScrollBar::handle:horizontal:hover {{ background: {hover}; }}
+        QScrollBar::handle:horizontal:hover {{ background: {hv}; }}
         QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
     """
 
 
-def app_stylesheet() -> str:
-    """Глобальный стиль всего приложения (читает текущую тему)."""
+def app_stylesheet():
+    """Глобальный стиль всего приложения."""
     return f"""
         QWidget {{
             background: {BG_DARK};
@@ -284,6 +267,37 @@ def app_stylesheet() -> str:
             border: 1px solid {BORDER_LT}; border-radius: {RADIUS_SM}; padding: 4px 8px;
             font-size: 12px;
         }}
+        /* BUG 4 FIX: explicit color on QPushButton so text never blends into background */
+        QPushButton {{
+            background: {BG_CARD};
+            color: {TEXT_PRI};
+            border: 1px solid {BORDER};
+            border-radius: {RADIUS};
+            padding: 5px 12px;
+            font-size: 12px;
+        }}
+        QPushButton:hover  {{ background: {BG_HOVER}; border-color: {BORDER_LT}; color: {TEXT_PRI}; }}
+        QPushButton:pressed {{ background: {BG_ACTIVE}; }}
+        QPushButton:disabled {{ color: {TEXT_MUT}; background: {BG_PANEL}; border-color: {BORDER}; }}
+        /* BUG 8 FIX: ensure QMessageBox text is always readable */
+        QMessageBox {{
+            background: {BG_DARK};
+            color: {TEXT_PRI};
+        }}
+        QMessageBox QLabel {{
+            color: {TEXT_PRI};
+            background: transparent;
+            font-size: 13px;
+        }}
+        QMessageBox QPushButton {{
+            background: {BG_CARD};
+            color: {TEXT_PRI};
+            border: 1px solid {BORDER};
+            border-radius: {RADIUS};
+            padding: 5px 16px;
+            min-width: 60px;
+        }}
+        QMessageBox QPushButton:hover {{ background: {BG_HOVER}; border-color: {BORDER_LT}; }}
         QComboBox {{
             background: {BG_CARD}; color: {TEXT_PRI};
             border: 1px solid {BORDER}; border-radius: {RADIUS};
